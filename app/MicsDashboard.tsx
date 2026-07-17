@@ -84,6 +84,14 @@ function PhotoPanel() {
   return <div className="feature-photo" role="img" aria-label="Children playing beneath a blue canopy" />;
 }
 
+function DataTooltip({ text, children, block = false }: { text: string; children: React.ReactNode; block?: boolean }) {
+  return (
+    <span className={`has-tooltip${block ? " tooltip-block" : ""}`} tabIndex={0} data-tooltip={text} aria-label={text}>
+      {children}
+    </span>
+  );
+}
+
 function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: string; setRound: (round: string) => void }) {
   const filtered = useMemo(() => rows.filter((row) => row.round === round), [rows, round]);
   const contentTitles = useMemo(() => unique(filtered.map((row) => row.contentTitle)), [filtered]);
@@ -137,7 +145,8 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
     const source = filtered.filter((row) => row.contentTitle === selectedQuestionnaire);
     return unique(source.map((row) => row.question)).slice(0, 10).map((question) => {
       const questionRows = source.filter((row) => row.question === question);
-      return { question, coverage: percent(questionRows.filter((row) => row.include === 1).length, questionRows.length) };
+      const included = questionRows.filter((row) => row.include === 1).length;
+      return { question, included, total: questionRows.length, coverage: percent(included, questionRows.length) };
     });
   }, [filtered, selectedQuestionnaire]);
 
@@ -160,20 +169,23 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
 
       <section className="dashboard-section">
         <h2>Coverage</h2>
+        <p className="section-note">Regional minimum, median and maximum coverage. Hover or focus any mark for its exact value.</p>
         <div className="coverage-head"><span>Total countries</span><span>% coverage</span></div>
         <div className="coverage-table">
           {coverageRows.map((item) => (
             <div className="coverage-row" key={item.question}>
-              <span className="row-label">{item.question.replace("List of ", "")}</span>
-              <div className="range-bar" aria-label={`${item.question}: ${item.min} to ${item.max} percent regional coverage`}>
-                <i className="range-min" style={{ width: `${item.min}%` }} />
-                <i className="range-mid" style={{ left: `${item.min}%`, width: `${Math.max(0, item.median - item.min)}%` }} />
-                <i className="range-max" style={{ left: `${item.median}%`, width: `${Math.max(0, item.max - item.median)}%` }} />
-              </div>
-              <div className="dot-range" aria-hidden="true">
-                <i className="dot dot-orange" style={{ left: `${clamp(item.min)}%` }} />
-                <i className="dot dot-gray" style={{ left: `${clamp(item.median)}%` }} />
-                <i className="dot dot-blue" style={{ left: `${clamp(item.max)}%` }} />
+              <span className="row-label">{item.question.replace("List of ", "")}<small>{item.min}% min · {item.median}% median · {item.max}% max</small></span>
+              <DataTooltip block text={`${item.question}: minimum ${item.min}%, median ${item.median}%, maximum ${item.max}% regional coverage`}>
+                <div className="range-bar">
+                  <i className="range-min" style={{ width: `${item.min}%` }} />
+                  <i className="range-mid" style={{ left: `${item.min}%`, width: `${Math.max(0, item.median - item.min)}%` }} />
+                  <i className="range-max" style={{ left: `${item.median}%`, width: `${Math.max(0, item.max - item.median)}%` }} />
+                </div>
+              </DataTooltip>
+              <div className="dot-range">
+                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className="dot dot-orange has-tooltip" style={{ left: `${clamp(item.min)}%` }} />
+                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className="dot dot-gray has-tooltip" style={{ left: `${clamp(item.median)}%` }} />
+                <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className="dot dot-blue has-tooltip" style={{ left: `${clamp(item.max)}%` }} />
               </div>
             </div>
           ))}
@@ -190,12 +202,15 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
           <h2>Questions coverage</h2>
           <SelectControl label="" value={selectedQuestionnaire} values={contentTitles} onChange={setQuestionnaire} ariaLabel="Questionnaire" />
         </div>
+        <p className="section-note">Share of surveyed countries including each question.</p>
         <div className="bar-list">
           {questionCoverage.map((item) => (
             <div className="bar-row" key={item.question}>
               <span>{item.question}</span>
-              <div className="bar-track"><i style={{ width: `${item.coverage}%` }} /></div>
-              <b>{item.coverage}%</b>
+              <DataTooltip block text={`${item.question}: ${item.included} of ${item.total} surveyed countries (${item.coverage}%) include this question`}>
+                <div className="bar-track"><i style={{ width: `${item.coverage}%` }} /></div>
+              </DataTooltip>
+              <b>{item.coverage}% <small>{item.included}/{item.total}</small></b>
             </div>
           ))}
         </div>
@@ -285,15 +300,18 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
 
       <section className="dashboard-section">
         <h2>Topic coverage</h2>
+        <p className="section-note">Questions included in the selected country survey, grouped by questionnaire.</p>
         <div className="coverage-head country-coverage-head"><span>Topics</span><span>% coverage</span></div>
         <div className="coverage-table country-coverage">
           {topicCoverage.map((item) => (
             <div className="coverage-row" key={item.name}>
-              <span className="row-label">{item.name}</span>
-              <div className="single-bar"><i style={{ width: `${item.coverage}%` }} /></div>
-              <div className="dot-range" aria-label={`${item.included} of ${item.total} questions included`}>
-                <i className="dot dot-gray" style={{ left: "100%" }} />
-                <i className="dot dot-blue" style={{ left: `${item.coverage}%` }} />
+              <span className="row-label">{item.name}<small>{item.included} of {item.total} questions · {item.coverage}%</small></span>
+              <DataTooltip block text={`${item.name}: ${item.included} of ${item.total} questions included (${item.coverage}%)`}>
+                <div className="single-bar"><i style={{ width: `${item.coverage}%` }} /></div>
+              </DataTooltip>
+              <div className="dot-range">
+                <i tabIndex={0} aria-label={`Total questions ${item.total}`} data-tooltip={`Total questions: ${item.total}`} className="dot dot-gray has-tooltip" style={{ left: "100%" }} />
+                <i tabIndex={0} aria-label={`Questions included ${item.included}, ${item.coverage}%`} data-tooltip={`Included: ${item.included} of ${item.total} (${item.coverage}%)`} className="dot dot-blue has-tooltip" style={{ left: `${item.coverage}%` }} />
               </div>
             </div>
           ))}
@@ -309,6 +327,7 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
           <h2>Question coverage</h2>
           <SelectControl label="" value={selectedQuestionnaire} values={contentTitles} onChange={setQuestionnaire} ariaLabel="Questionnaire" />
         </div>
+        <p className="section-note">Each dot represents this question’s status in a MICS round. Hover or focus to read the value.</p>
         <div className="matrix-scroll" tabIndex={0} aria-label="Question coverage by MICS round">
           <div className="matrix-grid matrix-header">
             <b>Questions</b>
@@ -321,7 +340,8 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
               {ROUND_ORDER.map((item) => {
                 const candidates = rows.filter((row) => row.round === item && countryKey(row.survey) === matchKey && row.contentTitle === selectedQuestionnaire && row.question === question);
                 const value = candidates[0]?.include;
-                return <i key={item} className={`matrix-dot ${value === 1 ? "included" : value === 0 ? "removed" : "missing"}`} title={`${item}: ${value === 1 ? "Included" : value === 0 ? "Not included" : "No record"}`} />;
+                const status = value === 1 ? "Included" : value === 0 ? "Not included" : "No record";
+                return <i key={item} tabIndex={0} aria-label={`${question}, ${item}: ${status}`} data-tooltip={`${item}: ${status}`} className={`matrix-dot has-tooltip ${value === 1 ? "included" : value === 0 ? "removed" : "missing"}`} />;
               })}
             </div>
           ))}
