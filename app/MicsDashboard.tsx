@@ -26,7 +26,7 @@ function markerShifts(values: number[]) {
   unique(values.map(String)).forEach((value) => {
     const indexes = values.map((item, index) => item === Number(value) ? index : -1).filter((index) => index >= 0);
     if (indexes.length < 2) return;
-    const spacing = 20;
+    const spacing = 10;
     const start = Number(value) >= 95 ? -(indexes.length - 1) * spacing : Number(value) <= 5 ? 0 : -((indexes.length - 1) * spacing) / 2;
     indexes.forEach((index, position) => { shifts[index] = start + position * spacing; });
   });
@@ -194,29 +194,29 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
           {coverageRows.map((item) => {
             const shifts = markerShifts([item.min, item.median, item.max]);
             return <div className="coverage-row" key={item.question}>
-              <span className="row-label">{item.question.replace("List of ", "")}<small>{item.min}% min · {item.median}% median · {item.max}% max</small></span>
+              <span className="row-label">{item.question.replace("List of ", "")}</span>
               <DataTooltip block text={`${item.question}: ${item.includedCountries} of ${item.totalCountries} countries include this topic (${item.countryCoverage}%)`}>
                 <div className="total-bar-group">
                   <div className="range-bar country-count-bar">
                     <i className="country-included" style={{ width: `${item.countryCoverage}%` }} />
                   </div>
                   <div className="total-bar-labels">
-                    <span>{item.includedCountries} included</span><span>{item.totalCountries} total countries</span>
+                    <span>{item.includedCountries} included</span><span>{item.totalCountries} countries</span>
                   </div>
                 </div>
               </DataTooltip>
               <div className="dot-range marker-range">
-                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className={`coverage-marker marker-orange has-tooltip ${item.min >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.min)}%`, marginLeft: shifts[0] }}><span>{item.min}%</span></i>
-                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className={`coverage-marker marker-gray has-tooltip ${item.median >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.median)}%`, marginLeft: shifts[1] }}><span>{item.median}%</span></i>
+                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className={`coverage-marker marker-orange has-tooltip ${item.min >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.min)}%`, marginLeft: shifts[0] }}>{item.min !== item.median && item.min !== item.max && <span>{item.min}%</span>}</i>
+                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className={`coverage-marker marker-gray has-tooltip ${item.median >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.median)}%`, marginLeft: shifts[1] }}>{item.median !== item.max && <span>{item.median}%</span>}</i>
                 <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className={`coverage-marker marker-blue has-tooltip ${item.max >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.max)}%`, marginLeft: shifts[2] }}><span>{item.max}%</span></i>
               </div>
             </div>;
           })}
         </div>
         <div className="legend coverage-marker-legend">
-          <span><i className="line-marker-key marker-blue" />maximum coverage</span>
-          <span><i className="line-marker-key marker-gray" />median coverage</span>
-          <span><i className="line-marker-key marker-orange" />minimum coverage</span>
+          <span><i className="line-marker-key marker-blue" />maximum</span>
+          <span><i className="line-marker-key marker-gray" />median</span>
+          <span><i className="line-marker-key marker-orange" />minimum</span>
         </div>
       </section>
 

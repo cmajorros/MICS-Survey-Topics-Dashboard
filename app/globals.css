@@ -239,6 +239,7 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   font-style: normal;
   cursor: help;
 }
+.marker-range .coverage-marker.has-tooltip { position: absolute; }
 .tooltip-block { display: block; width: 100%; }
 .has-tooltip::after {
   content: attr(data-tooltip);
