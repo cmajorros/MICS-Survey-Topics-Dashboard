@@ -176,10 +176,15 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
             <div className="coverage-row" key={item.question}>
               <span className="row-label">{item.question.replace("List of ", "")}<small>{item.min}% min · {item.median}% median · {item.max}% max</small></span>
               <DataTooltip block text={`${item.question}: minimum ${item.min}%, median ${item.median}%, maximum ${item.max}% regional coverage`}>
-                <div className="range-bar">
-                  <i className="range-min" style={{ width: `${item.min}%` }} />
-                  <i className="range-mid" style={{ left: `${item.min}%`, width: `${Math.max(0, item.median - item.min)}%` }} />
-                  <i className="range-max" style={{ left: `${item.median}%`, width: `${Math.max(0, item.max - item.median)}%` }} />
+                <div className="total-bar-group">
+                  <div className="range-bar">
+                    <i className="range-min" style={{ width: `${item.min}%` }} />
+                    <i className="range-mid" style={{ left: `${item.min}%`, width: `${Math.max(0, item.median - item.min)}%` }} />
+                    <i className="range-max" style={{ left: `${item.median}%`, width: `${Math.max(0, item.max - item.median)}%` }} />
+                  </div>
+                  <div className="total-bar-labels">
+                    <span>Min {item.min}%</span><span>Median {item.median}%</span><span>Max {item.max}%</span>
+                  </div>
                 </div>
               </DataTooltip>
               <div className="dot-range marker-range">

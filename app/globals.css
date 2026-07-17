@@ -162,6 +162,9 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 .range-min { left: 0; background: var(--orange); }
 .range-mid { background: var(--gray); }
 .range-max { background: var(--cyan); }
+.total-bar-group { display: grid; gap: 5px; }
+.total-bar-labels { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; line-height: 1; }
+.total-bar-labels span:nth-child(2) { color: #111; font-weight: 700; }
 .single-bar i, .bar-track i { display: block; height: 100%; background: var(--cyan); }
 .dot-range { position: relative; height: 24px; border-bottom: 1px solid var(--line); }
 .dot {
@@ -175,19 +178,30 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 .dot-blue { background: var(--cyan); }
 .dot-gray { background: var(--gray); }
 .dot-orange { background: var(--orange); }
-.marker-range { height: 58px; }
+.marker-range { height: 50px; border-bottom: 0; }
+.marker-range::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  left: 0;
+  right: 0;
+  bottom: 9px;
+  height: 22px;
+  background: #d7d7d7;
+}
 .coverage-marker {
   position: absolute;
-  bottom: -1px;
-  width: 3px;
-  height: 30px;
-  border-radius: 2px 2px 0 0;
+  z-index: 2;
+  bottom: 0;
+  width: 4px;
+  height: 42px;
+  border-radius: 2px;
   transform: translateX(-50%);
 }
 .coverage-marker span {
   position: absolute;
   left: 50%;
-  bottom: 34px;
+  bottom: 45px;
   min-width: 34px;
   padding: 2px 4px;
   border-radius: 5px;
@@ -199,11 +213,10 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   line-height: 1;
   text-align: center;
   transform: translateX(-50%);
-  box-shadow: 0 0 0 1px rgba(17, 17, 17, .08);
+  box-shadow: none;
 }
-.coverage-marker.marker-gray span { bottom: 46px; }
 .marker-blue { background: var(--cyan); }
-.marker-gray { background: #aeb5ba; }
+.marker-gray { background: #111; }
 .marker-orange { background: var(--orange); }
 .line-marker-key { display: inline-block; width: 3px; height: 18px; border-radius: 2px; }
 .legend { display: flex; justify-content: center; gap: 40px; margin-top: 22px; font-size: 12px; }
