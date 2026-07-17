@@ -21,18 +21,6 @@ const unique = (values: string[]) => [...new Set(values.filter(Boolean))];
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 const percent = (part: number, total: number) => (total ? Math.round((part / total) * 100) : 0);
 
-function markerShifts(values: number[]) {
-  const shifts = values.map(() => 0);
-  unique(values.map(String)).forEach((value) => {
-    const indexes = values.map((item, index) => item === Number(value) ? index : -1).filter((index) => index >= 0);
-    if (indexes.length < 2) return;
-    const spacing = 10;
-    const start = Number(value) >= 95 ? -(indexes.length - 1) * spacing : Number(value) <= 5 ? 0 : -((indexes.length - 1) * spacing) / 2;
-    indexes.forEach((index, position) => { shifts[index] = start + position * spacing; });
-  });
-  return shifts;
-}
-
 function median(values: number[]) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -192,7 +180,6 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
         <div className="coverage-head"><span>Total countries</span><span>% coverage</span></div>
         <div className="coverage-table">
           {coverageRows.map((item) => {
-            const shifts = markerShifts([item.min, item.median, item.max]);
             return <div className="coverage-row" key={item.question}>
               <span className="row-label">{item.question.replace("List of ", "")}</span>
               <DataTooltip block text={`${item.question}: ${item.includedCountries} of ${item.totalCountries} countries include this topic (${item.countryCoverage}%)`}>
@@ -206,9 +193,9 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
                 </div>
               </DataTooltip>
               <div className="dot-range marker-range">
-                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className={`coverage-marker marker-orange has-tooltip ${item.min >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.min)}%`, marginLeft: shifts[0] }}>{item.min !== item.median && item.min !== item.max && <span>{item.min}%</span>}</i>
-                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className={`coverage-marker marker-gray has-tooltip ${item.median >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.median)}%`, marginLeft: shifts[1] }}>{item.median !== item.max && <span>{item.median}%</span>}</i>
-                <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className={`coverage-marker marker-blue has-tooltip ${item.max >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.max)}%`, marginLeft: shifts[2] }}><span>{item.max}%</span></i>
+                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className={`coverage-marker marker-orange has-tooltip ${item.min >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.min)}%` }}>{item.min !== item.median && item.min !== item.max && <span>{item.min}%</span>}</i>
+                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className={`coverage-marker marker-gray has-tooltip ${item.median >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.median)}%` }}>{item.median !== item.max && <span>{item.median}%</span>}</i>
+                <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className={`coverage-marker marker-blue has-tooltip ${item.max >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.max)}%` }}><span>{item.max}%</span></i>
               </div>
             </div>;
           })}
