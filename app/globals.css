@@ -88,24 +88,25 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 
 .hero-grid {
   display: grid;
-  grid-template-columns: 546px 310px;
-  gap: 18px;
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 14px;
   align-items: stretch;
   margin-bottom: 32px;
 }
-.metric-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 7px; }
+.metric-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
 .metric-card {
   min-width: 0;
   min-height: 178px;
-  padding: 18px 18px 14px;
-  border-radius: 26px;
+  padding: 19px 22px 16px;
+  border-radius: 24px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
-.metric-card h3 { margin: 0; max-width: 210px; font-size: 20px; line-height: 1.05; font-weight: 400; }
+.metric-card h3 { margin: 0; max-width: 240px; font-size: 19px; line-height: 1.1; font-weight: 400; }
 .metric-card strong { margin-top: 17px; font-size: 58px; line-height: .86; font-weight: 400; letter-spacing: -2px; }
-.metric-card p { margin: auto 0 0; max-width: 210px; font-size: 13px; line-height: 1.15; }
+.metric-card p { margin: auto 0 0; max-width: 240px; font-size: 13px; line-height: 1.2; }
 .metric-gray { background: var(--card-gray); }
 .metric-cyan { background: var(--cyan); }
 .metric-navy { background: var(--navy); color: #fff; }
