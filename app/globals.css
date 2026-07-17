@@ -322,15 +322,15 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   position: absolute;
   z-index: 2;
   bottom: 0;
-  width: 3px;
+  width: 2px;
   height: 32px;
-  background: #555b60;
+  background: #777d82;
   border-radius: 2px;
   transform: translateX(-50%);
 }
 .selected-country-marker.has-tooltip {
   z-index: 3;
-  width: 4px;
+  width: 2px;
   background: var(--cyan);
 }
 .selected-country-marker span {
@@ -350,7 +350,7 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 }
 .selected-country-marker.at-right span { left: auto; right: -2px; transform: none; }
 .selected-country-key { background: var(--cyan); }
-.comparison-country-key { background: #555b60; }
+.comparison-country-key { background: #777d82; }
 .comparison-legend { margin-top: 12px; }
 .matrix-scroll { overflow-x: auto; padding-bottom: 4px; }
 .matrix-grid {
