@@ -175,6 +175,37 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 .dot-blue { background: var(--cyan); }
 .dot-gray { background: var(--gray); }
 .dot-orange { background: var(--orange); }
+.marker-range { height: 58px; }
+.coverage-marker {
+  position: absolute;
+  bottom: -1px;
+  width: 3px;
+  height: 30px;
+  border-radius: 2px 2px 0 0;
+  transform: translateX(-50%);
+}
+.coverage-marker span {
+  position: absolute;
+  left: 50%;
+  bottom: 34px;
+  min-width: 34px;
+  padding: 2px 4px;
+  border-radius: 5px;
+  background: #fff;
+  color: var(--ink);
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  transform: translateX(-50%);
+  box-shadow: 0 0 0 1px rgba(17, 17, 17, .08);
+}
+.coverage-marker.marker-gray span { bottom: 46px; }
+.marker-blue { background: var(--cyan); }
+.marker-gray { background: #aeb5ba; }
+.marker-orange { background: var(--orange); }
+.line-marker-key { display: inline-block; width: 3px; height: 18px; border-radius: 2px; }
 .legend { display: flex; justify-content: center; gap: 40px; margin-top: 22px; font-size: 12px; }
 .legend span { display: inline-flex; align-items: center; gap: 9px; }
 .legend .dot { position: static; width: 15px; height: 15px; transform: none; }

@@ -168,7 +168,7 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
       </div>
 
       <section className="dashboard-section">
-        <h2>Coverage</h2>
+        <h2>Coverage by topic</h2>
         <p className="section-note">Regional minimum, median and maximum coverage. Hover or focus any mark for its exact value.</p>
         <div className="coverage-head"><span>Total countries</span><span>% coverage</span></div>
         <div className="coverage-table">
@@ -182,18 +182,18 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
                   <i className="range-max" style={{ left: `${item.median}%`, width: `${Math.max(0, item.max - item.median)}%` }} />
                 </div>
               </DataTooltip>
-              <div className="dot-range">
-                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className="dot dot-orange has-tooltip" style={{ left: `${clamp(item.min)}%` }} />
-                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className="dot dot-gray has-tooltip" style={{ left: `${clamp(item.median)}%` }} />
-                <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className="dot dot-blue has-tooltip" style={{ left: `${clamp(item.max)}%` }} />
+              <div className="dot-range marker-range">
+                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className="coverage-marker marker-orange has-tooltip" style={{ left: `${clamp(item.min)}%` }}><span>{item.min}%</span></i>
+                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className="coverage-marker marker-gray has-tooltip" style={{ left: `${clamp(item.median)}%` }}><span>{item.median}%</span></i>
+                <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className="coverage-marker marker-blue has-tooltip" style={{ left: `${clamp(item.max)}%` }}><span>{item.max}%</span></i>
               </div>
             </div>
           ))}
         </div>
         <div className="legend">
-          <span><i className="dot dot-blue" />maximum coverage</span>
-          <span><i className="dot dot-gray" />median coverage</span>
-          <span><i className="dot dot-orange" />minimum coverage</span>
+          <span><i className="line-marker-key marker-blue" />maximum coverage</span>
+          <span><i className="line-marker-key marker-gray" />median coverage</span>
+          <span><i className="line-marker-key marker-orange" />minimum coverage</span>
         </div>
       </section>
 
@@ -340,7 +340,7 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
               {ROUND_ORDER.map((item) => {
                 const candidates = rows.filter((row) => row.round === item && countryKey(row.survey) === matchKey && row.contentTitle === selectedQuestionnaire && row.question === question);
                 const value = candidates[0]?.include;
-                const status = value === 1 ? "Included" : value === 0 ? "Not included" : "No record";
+                const status = value === 1 ? "Included" : value === 0 ? "Not included" : "No record / Not conduct survey";
                 return <i key={item} tabIndex={0} aria-label={`${question}, ${item}: ${status}`} data-tooltip={`${item}: ${status}`} className={`matrix-dot has-tooltip ${value === 1 ? "included" : value === 0 ? "removed" : "missing"}`} />;
               })}
             </div>
@@ -349,7 +349,7 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
         <div className="legend matrix-legend">
           <span><i className="dot dot-blue" />Include</span>
           <span><i className="dot dot-orange" />Not included</span>
-          <span><i className="dot dot-gray" />No record</span>
+          <span><i className="dot dot-gray" />No record / Not conduct survey</span>
         </div>
       </section>
     </section>
