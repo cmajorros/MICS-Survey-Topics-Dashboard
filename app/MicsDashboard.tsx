@@ -1,0 +1,368 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+
+type MicsRow = {
+  contentTitle: string;
+  region: string;
+  survey: string;
+  round: string;
+  question: string;
+  include: 0 | 1;
+};
+
+type Payload = { source: string; rows: MicsRow[] };
+type ViewName = "overview" | "country";
+
+const ROUND_ORDER = ["MICS 6", "MICS 5", "MICS 4", "MICS 3", "MICS 2"];
+const BLUE = "#22a9d6";
+
+const unique = (values: string[]) => [...new Set(values.filter(Boolean))];
+const clamp = (value: number) => Math.max(0, Math.min(100, value));
+const percent = (part: number, total: number) => (total ? Math.round((part / total) * 100) : 0);
+
+function median(values: number[]) {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : Math.round((sorted[middle - 1] + sorted[middle]) / 2);
+}
+
+function countryKey(value: string) {
+  return value.toLowerCase().replace(/\s*\[\d{4}\]\s*/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function shortContentTitle(value: string) {
+  return value
+    .replace(/^Contents of /i, "")
+    .replace(/ questionnaire$/i, "")
+    .replace(/^the /i, "")
+    .replace(/under[- ]five/i, "Children under five")
+    .replace(/women'?s/i, "Women")
+    .replace(/men'?s/i, "Men")
+    .replace(/household/i, "Household")
+    .replace(/questionnaire/i, "")
+    .trim()
+    .replace(/^./, (character) => character.toUpperCase());
+}
+
+function SelectControl({ label, value, values, onChange, ariaLabel }: {
+  label: string;
+  value: string;
+  values: string[];
+  onChange: (value: string) => void;
+  ariaLabel?: string;
+}) {
+  return (
+    <label className="filter-control">
+      <span>{label}</span>
+      <select aria-label={ariaLabel ?? label} value={value} onChange={(event) => onChange(event.target.value)}>
+        {values.map((item) => <option key={item} value={item}>{item}</option>)}
+      </select>
+    </label>
+  );
+}
+
+function MetricCard({ label, value, tone = "gray", note, children }: {
+  label: string;
+  value: string | number;
+  tone?: "gray" | "cyan" | "navy" | "pale";
+  note?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <article className={`metric-card metric-${tone}`}>
+      <h3>{label}</h3>
+      <strong>{value}</strong>
+      {note && <p>{note}</p>}
+      {children}
+    </article>
+  );
+}
+
+function PhotoPanel() {
+  return <div className="feature-photo" role="img" aria-label="Children playing beneath a blue canopy" />;
+}
+
+function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: string; setRound: (round: string) => void }) {
+  const filtered = useMemo(() => rows.filter((row) => row.round === round), [rows, round]);
+  const contentTitles = useMemo(() => unique(filtered.map((row) => row.contentTitle)), [filtered]);
+  const [questionnaire, setQuestionnaire] = useState("");
+  const selectedQuestionnaire = contentTitles.includes(questionnaire)
+    ? questionnaire
+    : contentTitles.find((title) => /household/i.test(title)) ?? contentTitles[0] ?? "";
+
+  const metrics = useMemo(() => {
+    const topics = unique(filtered.map((row) => row.question)).length;
+    const bySurvey = new Map<string, Set<string>>();
+    filtered.filter((row) => row.include === 1).forEach((row) => {
+      if (!bySurvey.has(row.survey)) bySurvey.set(row.survey, new Set());
+      bySurvey.get(row.survey)?.add(row.question);
+    });
+    return {
+      topics,
+      medianIncluded: median([...bySurvey.values()].map((questions) => questions.size)),
+      coverage: percent(filtered.filter((row) => row.include === 1).length, filtered.length),
+      countries: unique(filtered.map((row) => row.survey)).length,
+    };
+  }, [filtered]);
+
+  const coverageRows = useMemo(() => {
+    const preferred = [
+      /list of household members/i,
+      /^education/i,
+      /water and sanitation/i,
+      /child (discipline|protection)/i,
+      /^health/i,
+    ];
+    const questions = unique(filtered.map((row) => row.question));
+    const selected = preferred.map((pattern) => questions.find((question) => pattern.test(question))).filter(Boolean) as string[];
+    questions.forEach((question) => { if (selected.length < 5 && !selected.includes(question)) selected.push(question); });
+    return selected.slice(0, 5).map((question) => {
+      const questionRows = filtered.filter((row) => row.question === question);
+      const regionalRates = unique(questionRows.map((row) => row.region)).map((region) => {
+        const regionRows = questionRows.filter((row) => row.region === region);
+        return percent(regionRows.filter((row) => row.include === 1).length, regionRows.length);
+      });
+      return {
+        question,
+        min: Math.min(...regionalRates),
+        median: median(regionalRates),
+        max: Math.max(...regionalRates),
+      };
+    });
+  }, [filtered]);
+
+  const questionCoverage = useMemo(() => {
+    const source = filtered.filter((row) => row.contentTitle === selectedQuestionnaire);
+    return unique(source.map((row) => row.question)).slice(0, 10).map((question) => {
+      const questionRows = source.filter((row) => row.question === question);
+      return { question, coverage: percent(questionRows.filter((row) => row.include === 1).length, questionRows.length) };
+    });
+  }, [filtered, selectedQuestionnaire]);
+
+  return (
+    <section aria-labelledby="overview-title">
+      <div className="view-heading">
+        <h1 id="overview-title">Overall</h1>
+        <SelectControl label="Content from" value={round} values={ROUND_ORDER} onChange={setRound} ariaLabel="MICS round" />
+      </div>
+
+      <div className="hero-grid">
+        <div className="metric-grid">
+          <MetricCard label="Topics" value={metrics.topics} />
+          <MetricCard label="Median Topics Included on survey" value={metrics.medianIncluded} tone="cyan" />
+          <MetricCard label="Coverage" value={`${metrics.coverage}%`} tone="navy" note="Topics included on survey / Total topics" />
+          <MetricCard label="Total participated countries" value={metrics.countries} tone="pale" />
+        </div>
+        <PhotoPanel />
+      </div>
+
+      <section className="dashboard-section">
+        <h2>Coverage</h2>
+        <div className="coverage-head"><span>Total countries</span><span>% coverage</span></div>
+        <div className="coverage-table">
+          {coverageRows.map((item) => (
+            <div className="coverage-row" key={item.question}>
+              <span className="row-label">{item.question.replace("List of ", "")}</span>
+              <div className="range-bar" aria-label={`${item.question}: ${item.min} to ${item.max} percent regional coverage`}>
+                <i className="range-min" style={{ width: `${item.min}%` }} />
+                <i className="range-mid" style={{ left: `${item.min}%`, width: `${Math.max(0, item.median - item.min)}%` }} />
+                <i className="range-max" style={{ left: `${item.median}%`, width: `${Math.max(0, item.max - item.median)}%` }} />
+              </div>
+              <div className="dot-range" aria-hidden="true">
+                <i className="dot dot-orange" style={{ left: `${clamp(item.min)}%` }} />
+                <i className="dot dot-gray" style={{ left: `${clamp(item.median)}%` }} />
+                <i className="dot dot-blue" style={{ left: `${clamp(item.max)}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="legend">
+          <span><i className="dot dot-blue" />maximum coverage</span>
+          <span><i className="dot dot-gray" />median coverage</span>
+          <span><i className="dot dot-orange" />minimum coverage</span>
+        </div>
+      </section>
+
+      <section className="dashboard-section question-section">
+        <div className="section-title-row">
+          <h2>Questions coverage</h2>
+          <SelectControl label="" value={selectedQuestionnaire} values={contentTitles} onChange={setQuestionnaire} ariaLabel="Questionnaire" />
+        </div>
+        <div className="bar-list">
+          {questionCoverage.map((item) => (
+            <div className="bar-row" key={item.question}>
+              <span>{item.question}</span>
+              <div className="bar-track"><i style={{ width: `${item.coverage}%` }} /></div>
+              <b>{item.coverage}%</b>
+            </div>
+          ))}
+        </div>
+        <p className="chart-caption">% of surveyed countries that include the question in the selected questionnaire</p>
+      </section>
+    </section>
+  );
+}
+
+function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string; setRound: (round: string) => void }) {
+  const regions = useMemo(() => unique(rows.filter((row) => row.round === round).map((row) => row.region)).sort(), [rows, round]);
+  const [region, setRegion] = useState("");
+  const [country, setCountry] = useState("");
+  const [questionnaire, setQuestionnaire] = useState("");
+  const selectedRegion = regions.includes(region)
+    ? region
+    : rows.find((row) => row.round === round && countryKey(row.survey) === "thailand")?.region ?? regions[0] ?? "";
+  const countries = useMemo(() => unique(rows.filter((row) => row.round === round && row.region === selectedRegion).map((row) => row.survey)).sort(), [rows, round, selectedRegion]);
+  const selectedCountry = countries.includes(country) ? country : countries.find((item) => countryKey(item) === "thailand") ?? countries[0] ?? "";
+  const currentRows = useMemo(() => rows.filter((row) => row.round === round && row.survey === selectedCountry), [rows, round, selectedCountry]);
+  const contentTitles = useMemo(() => unique(currentRows.map((row) => row.contentTitle)), [currentRows]);
+  const selectedQuestionnaire = contentTitles.includes(questionnaire)
+    ? questionnaire
+    : contentTitles.find((title) => /household/i.test(title)) ?? contentTitles[0] ?? "";
+
+  const metrics = useMemo(() => {
+    const total = unique(currentRows.map((row) => row.question)).length;
+    const included = unique(currentRows.filter((row) => row.include === 1).map((row) => row.question)).length;
+    const currentRoundIndex = ROUND_ORDER.indexOf(round);
+    const previousRound = ROUND_ORDER[currentRoundIndex + 1];
+    const matchKey = countryKey(selectedCountry);
+    const previousRows = rows.filter((row) => row.round === previousRound && countryKey(row.survey) === matchKey);
+    const currentMap = new Map(currentRows.map((row) => [`${row.contentTitle}||${row.question}`, row.include]));
+    const previousMap = new Map(previousRows.map((row) => [`${row.contentTitle}||${row.question}`, row.include]));
+    const keys = unique([...currentMap.keys(), ...previousMap.keys()]);
+    const added = keys.filter((key) => (currentMap.get(key) ?? 0) === 1 && (previousMap.get(key) ?? 0) === 0).length;
+    const removed = keys.filter((key) => (currentMap.get(key) ?? 0) === 0 && (previousMap.get(key) ?? 0) === 1).length;
+    return { total, included, coverage: percent(included, total), added, removed, previousRound };
+  }, [selectedCountry, currentRows, round, rows]);
+
+  const topicCoverage = useMemo(() => contentTitles.slice(0, 5).map((contentTitle) => {
+    const topicRows = currentRows.filter((row) => row.contentTitle === contentTitle);
+    const total = unique(topicRows.map((row) => row.question)).length;
+    const included = unique(topicRows.filter((row) => row.include === 1).map((row) => row.question)).length;
+    return { name: shortContentTitle(contentTitle), total, included, coverage: percent(included, total) };
+  }), [contentTitles, currentRows]);
+
+  const matrixQuestions = useMemo(() => unique(currentRows.filter((row) => row.contentTitle === selectedQuestionnaire).map((row) => row.question)).slice(0, 14), [currentRows, selectedQuestionnaire]);
+  const matchKey = countryKey(selectedCountry);
+
+  function downloadCsv() {
+    const header = ["Content Title", "Region", "Survey", "MICS Round", "Question", "Include"];
+    const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+    const csv = [header, ...currentRows.map((row) => [row.contentTitle, row.region, row.survey, row.round, row.question, row.include])]
+      .map((line) => line.map(escape).join(",")).join("\r\n");
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${selectedCountry.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${round.toLowerCase().replace(" ", "-")}-mics-content.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <section aria-labelledby="country-title">
+      <div className="view-heading country-heading">
+        <h1 id="country-title">{selectedCountry || "Country"}</h1>
+        <div className="filter-row">
+          <SelectControl label="Region" value={selectedRegion} values={regions} onChange={setRegion} />
+          <SelectControl label="Country" value={selectedCountry} values={countries} onChange={setCountry} />
+          <SelectControl label="Content from" value={round} values={ROUND_ORDER} onChange={setRound} ariaLabel="MICS round" />
+          <button className="download-button" type="button" onClick={downloadCsv}>Download data</button>
+        </div>
+      </div>
+
+      <div className="hero-grid">
+        <div className="metric-grid">
+          <MetricCard label="Questions" value={metrics.total} />
+          <MetricCard label="Topics Included on survey" value={metrics.included} tone="cyan" />
+          <MetricCard label="Coverage" value={`${metrics.coverage}%`} tone="navy" note="Topics included on survey / Total topics" />
+          <MetricCard label="Change from previous round" value={`+${metrics.added}/-${metrics.removed}`} tone="pale">
+            <div className="change-labels"><span>added</span><span>removed</span></div>
+          </MetricCard>
+        </div>
+        <PhotoPanel />
+      </div>
+
+      <section className="dashboard-section">
+        <h2>Topic coverage</h2>
+        <div className="coverage-head country-coverage-head"><span>Topics</span><span>% coverage</span></div>
+        <div className="coverage-table country-coverage">
+          {topicCoverage.map((item) => (
+            <div className="coverage-row" key={item.name}>
+              <span className="row-label">{item.name}</span>
+              <div className="single-bar"><i style={{ width: `${item.coverage}%` }} /></div>
+              <div className="dot-range" aria-label={`${item.included} of ${item.total} questions included`}>
+                <i className="dot dot-gray" style={{ left: "100%" }} />
+                <i className="dot dot-blue" style={{ left: `${item.coverage}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="legend country-legend">
+          <span><i className="line-key" />Total questions</span>
+          <span><i className="dot dot-blue" />Total questions included in survey</span>
+        </div>
+      </section>
+
+      <section className="dashboard-section matrix-section">
+        <div className="section-title-row">
+          <h2>Question coverage</h2>
+          <SelectControl label="" value={selectedQuestionnaire} values={contentTitles} onChange={setQuestionnaire} ariaLabel="Questionnaire" />
+        </div>
+        <div className="matrix-scroll" tabIndex={0} aria-label="Question coverage by MICS round">
+          <div className="matrix-grid matrix-header">
+            <b>Questions</b>
+            <b className="round-heading">MICS Round</b>
+            {ROUND_ORDER.map((item) => <span key={item}>{item.replace("MICS ", "")}</span>)}
+          </div>
+          {matrixQuestions.map((question) => (
+            <div className="matrix-grid" key={question}>
+              <span>{question}</span><i aria-hidden="true" />
+              {ROUND_ORDER.map((item) => {
+                const candidates = rows.filter((row) => row.round === item && countryKey(row.survey) === matchKey && row.contentTitle === selectedQuestionnaire && row.question === question);
+                const value = candidates[0]?.include;
+                return <i key={item} className={`matrix-dot ${value === 1 ? "included" : value === 0 ? "removed" : "missing"}`} title={`${item}: ${value === 1 ? "Included" : value === 0 ? "Not included" : "No record"}`} />;
+              })}
+            </div>
+          ))}
+        </div>
+        <div className="legend matrix-legend">
+          <span><i className="dot dot-blue" />Include</span>
+          <span><i className="dot dot-orange" />Not included</span>
+          <span><i className="dot dot-gray" />No record</span>
+        </div>
+      </section>
+    </section>
+  );
+}
+
+export function MicsDashboard() {
+  const [rows, setRows] = useState<MicsRow[]>([]);
+  const [view, setView] = useState<ViewName>("overview");
+  const [round, setRound] = useState("MICS 6");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    fetch("/data/mics-question-include.json")
+      .then((response) => {
+        if (!response.ok) throw new Error("The MICS dataset could not be loaded.");
+        return response.json() as Promise<Payload>;
+      })
+      .then((payload) => setRows(payload.rows))
+      .catch((reason: Error) => setError(reason.message));
+  }, []);
+
+  return (
+    <main className="dashboard-shell">
+      <nav className="view-tabs" aria-label="Dashboard views">
+        <button className={view === "overview" ? "active" : ""} type="button" onClick={() => setView("overview")}>Overview</button>
+        <button className={view === "country" ? "active" : ""} type="button" onClick={() => setView("country")}>Country view</button>
+      </nav>
+      {error && <div className="status-message error">{error}</div>}
+      {!error && !rows.length && <div className="status-message">Loading MICS survey content…</div>}
+      {!!rows.length && view === "overview" && <OverviewView rows={rows} round={round} setRound={setRound} />}
+      {!!rows.length && view === "country" && <CountryView rows={rows} round={round} setRound={setRound} />}
+      <footer>Source: UNICEF MICS Contents by Survey · MICS rounds 2–6</footer>
+    </main>
+  );
+}
