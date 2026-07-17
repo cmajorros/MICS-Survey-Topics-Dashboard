@@ -127,6 +127,7 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   background-image: url("/assets/country-mics-team.png");
   background-size: cover;
   background-position: center;
+  opacity: .7;
 }
 
 .dashboard-section { margin-top: 30px; }
