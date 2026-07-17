@@ -21,6 +21,18 @@ const unique = (values: string[]) => [...new Set(values.filter(Boolean))];
 const clamp = (value: number) => Math.max(0, Math.min(100, value));
 const percent = (part: number, total: number) => (total ? Math.round((part / total) * 100) : 0);
 
+function markerShifts(values: number[]) {
+  const shifts = values.map(() => 0);
+  unique(values.map(String)).forEach((value) => {
+    const indexes = values.map((item, index) => item === Number(value) ? index : -1).filter((index) => index >= 0);
+    if (indexes.length < 2) return;
+    const spacing = 20;
+    const start = Number(value) >= 95 ? -(indexes.length - 1) * spacing : Number(value) <= 5 ? 0 : -((indexes.length - 1) * spacing) / 2;
+    indexes.forEach((index, position) => { shifts[index] = start + position * spacing; });
+  });
+  return shifts;
+}
+
 function median(values: number[]) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
@@ -130,10 +142,17 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
       const questionRows = filtered.filter((row) => row.question === question);
       const regionalRates = unique(questionRows.map((row) => row.region)).map((region) => {
         const regionRows = questionRows.filter((row) => row.region === region);
-        return percent(regionRows.filter((row) => row.include === 1).length, regionRows.length);
+        const regionCountries = unique(regionRows.map((row) => row.survey));
+        const includedCountries = regionCountries.filter((survey) => regionRows.some((row) => row.survey === survey && row.include === 1));
+        return percent(includedCountries.length, regionCountries.length);
       });
+      const countries = unique(questionRows.map((row) => row.survey));
+      const includedCountries = countries.filter((survey) => questionRows.some((row) => row.survey === survey && row.include === 1));
       return {
         question,
+        totalCountries: countries.length,
+        includedCountries: includedCountries.length,
+        countryCoverage: percent(includedCountries.length, countries.length),
         min: Math.min(...regionalRates),
         median: median(regionalRates),
         max: Math.max(...regionalRates),
@@ -172,30 +191,29 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
         <p className="section-note">Regional minimum, median and maximum coverage. Hover or focus any mark for its exact value.</p>
         <div className="coverage-head"><span>Total countries</span><span>% coverage</span></div>
         <div className="coverage-table">
-          {coverageRows.map((item) => (
-            <div className="coverage-row" key={item.question}>
+          {coverageRows.map((item) => {
+            const shifts = markerShifts([item.min, item.median, item.max]);
+            return <div className="coverage-row" key={item.question}>
               <span className="row-label">{item.question.replace("List of ", "")}<small>{item.min}% min · {item.median}% median · {item.max}% max</small></span>
-              <DataTooltip block text={`${item.question}: minimum ${item.min}%, median ${item.median}%, maximum ${item.max}% regional coverage`}>
+              <DataTooltip block text={`${item.question}: ${item.includedCountries} of ${item.totalCountries} countries include this topic (${item.countryCoverage}%)`}>
                 <div className="total-bar-group">
-                  <div className="range-bar">
-                    <i className="range-min" style={{ width: `${item.min}%` }} />
-                    <i className="range-mid" style={{ left: `${item.min}%`, width: `${Math.max(0, item.median - item.min)}%` }} />
-                    <i className="range-max" style={{ left: `${item.median}%`, width: `${Math.max(0, item.max - item.median)}%` }} />
+                  <div className="range-bar country-count-bar">
+                    <i className="country-included" style={{ width: `${item.countryCoverage}%` }} />
                   </div>
                   <div className="total-bar-labels">
-                    <span>Min {item.min}%</span><span>Median {item.median}%</span><span>Max {item.max}%</span>
+                    <span>{item.includedCountries} included</span><span>{item.totalCountries} total countries</span>
                   </div>
                 </div>
               </DataTooltip>
               <div className="dot-range marker-range">
-                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className="coverage-marker marker-orange has-tooltip" style={{ left: `${clamp(item.min)}%` }}><span>{item.min}%</span></i>
-                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className="coverage-marker marker-gray has-tooltip" style={{ left: `${clamp(item.median)}%` }}><span>{item.median}%</span></i>
-                <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className="coverage-marker marker-blue has-tooltip" style={{ left: `${clamp(item.max)}%` }}><span>{item.max}%</span></i>
+                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className={`coverage-marker marker-orange has-tooltip ${item.min >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.min)}%`, marginLeft: shifts[0] }}><span>{item.min}%</span></i>
+                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className={`coverage-marker marker-gray has-tooltip ${item.median >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.median)}%`, marginLeft: shifts[1] }}><span>{item.median}%</span></i>
+                <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className={`coverage-marker marker-blue has-tooltip ${item.max >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.max)}%`, marginLeft: shifts[2] }}><span>{item.max}%</span></i>
               </div>
-            </div>
-          ))}
+            </div>;
+          })}
         </div>
-        <div className="legend">
+        <div className="legend coverage-marker-legend">
           <span><i className="line-marker-key marker-blue" />maximum coverage</span>
           <span><i className="line-marker-key marker-gray" />median coverage</span>
           <span><i className="line-marker-key marker-orange" />minimum coverage</span>

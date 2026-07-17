@@ -162,9 +162,11 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 .range-min { left: 0; background: var(--orange); }
 .range-mid { background: var(--gray); }
 .range-max { background: var(--cyan); }
+.country-count-bar { background: #d7d7d7; }
+.country-count-bar .country-included { left: 0; background: var(--orange); }
 .total-bar-group { display: grid; gap: 5px; }
 .total-bar-labels { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 10px; line-height: 1; }
-.total-bar-labels span:nth-child(2) { color: #111; font-weight: 700; }
+.total-bar-labels span:last-child { color: #111; font-weight: 700; text-align: right; }
 .single-bar i, .bar-track i { display: block; height: 100%; background: var(--cyan); }
 .dot-range { position: relative; height: 24px; border-bottom: 1px solid var(--line); }
 .dot {
@@ -178,15 +180,15 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 .dot-blue { background: var(--cyan); }
 .dot-gray { background: var(--gray); }
 .dot-orange { background: var(--orange); }
-.marker-range { height: 50px; border-bottom: 0; }
+.marker-range { height: 40px; border-bottom: 0; }
 .marker-range::after {
   content: "";
   position: absolute;
   z-index: 0;
   left: 0;
   right: 0;
-  bottom: 9px;
-  height: 22px;
+  bottom: 2px;
+  height: 20px;
   background: #d7d7d7;
 }
 .coverage-marker {
@@ -194,27 +196,28 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   z-index: 2;
   bottom: 0;
   width: 4px;
-  height: 42px;
+  height: 32px;
   border-radius: 2px;
   transform: translateX(-50%);
 }
 .coverage-marker span {
   position: absolute;
   left: 50%;
-  bottom: 45px;
-  min-width: 34px;
-  padding: 2px 4px;
+  bottom: 34px;
+  min-width: 28px;
+  padding: 1px 2px;
   border-radius: 5px;
   background: #fff;
   color: var(--ink);
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   line-height: 1;
   text-align: center;
   transform: translateX(-50%);
   box-shadow: none;
 }
+.coverage-marker.at-right span { left: auto; right: -2px; transform: none; }
 .marker-blue { background: var(--cyan); }
 .marker-gray { background: #111; }
 .marker-orange { background: var(--orange); }
@@ -223,6 +226,13 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 .legend span { display: inline-flex; align-items: center; gap: 9px; }
 .legend .dot { position: static; width: 15px; height: 15px; transform: none; }
 .line-key { width: 20px; border-top: 1px solid var(--line); }
+.coverage-marker-legend {
+  width: min(100%, 230px);
+  margin: 12px 0 0 auto;
+  display: grid;
+  justify-content: start;
+  gap: 7px;
+}
 
 .has-tooltip {
   position: relative;
@@ -274,7 +284,8 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 .has-tooltip:focus-visible::after { transform: translate(-50%, 0); }
 
 .section-title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
-.section-title-row .filter-control { max-width: 280px; margin-bottom: 14px; }
+.section-title-row .filter-control { width: min(100%, 430px); max-width: 430px; margin-bottom: 14px; }
+.section-title-row .filter-control select { width: 100%; max-width: none; }
 .bar-list { display: grid; gap: 12px; }
 .bar-row {
   display: grid;
