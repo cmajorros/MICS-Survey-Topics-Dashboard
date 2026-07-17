@@ -123,6 +123,11 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   background-position: -494px -125px;
   box-shadow: inset 0 0 0 1px rgba(0,0,0,.04);
 }
+.feature-photo.country-photo {
+  background-image: url("/assets/country-mics-team.png");
+  background-size: cover;
+  background-position: center;
+}
 
 .dashboard-section { margin-top: 30px; }
 .dashboard-section h2 { margin: 0 0 22px; font-size: 25px; }

@@ -83,8 +83,8 @@ function MetricCard({ label, value, tone = "gray", note, children }: {
   );
 }
 
-function PhotoPanel() {
-  return <div className="feature-photo" role="img" aria-label="Children playing beneath a blue canopy" />;
+function PhotoPanel({ country = false }: { country?: boolean }) {
+  return <div className={`feature-photo${country ? " country-photo" : ""}`} role="img" aria-label={country ? "MICS field team preparing survey equipment" : "Children playing beneath a blue canopy"} />;
 }
 
 function DataTooltip({ text, children, block = false }: { text: string; children: React.ReactNode; block?: boolean }) {
@@ -329,7 +329,7 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
             <div className="change-labels"><span>added</span><span>removed</span></div>
           </MetricCard>
         </div>
-        <PhotoPanel />
+        <PhotoPanel country />
       </div>
 
       <section className="dashboard-section">
