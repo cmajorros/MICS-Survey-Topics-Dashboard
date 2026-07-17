@@ -13,8 +13,11 @@ type MicsRow = {
 
 type Payload = { source: string; rows: MicsRow[] };
 type ViewName = "overview" | "country";
+type ComparisonMode = "All MICS countries" | "All countries in the same region" | "Median of region" | "Median of MICS countries";
 
 const ROUND_ORDER = ["MICS 6", "MICS 5", "MICS 4", "MICS 3", "MICS 2"];
+const ALL_COUNTRIES = "All countries";
+const COMPARISON_OPTIONS: ComparisonMode[] = ["All MICS countries", "All countries in the same region", "Median of region", "Median of MICS countries"];
 const BLUE = "#22a9d6";
 
 const unique = (values: string[]) => [...new Set(values.filter(Boolean))];
@@ -235,12 +238,14 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
   const [region, setRegion] = useState("");
   const [country, setCountry] = useState("");
   const [questionnaire, setQuestionnaire] = useState("");
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("All countries in the same region");
   const selectedRegion = regions.includes(region)
     ? region
     : rows.find((row) => row.round === round && countryKey(row.survey) === "thailand")?.region ?? regions[0] ?? "";
-  const countries = useMemo(() => unique(rows.filter((row) => row.round === round && row.region === selectedRegion).map((row) => row.survey)).sort(), [rows, round, selectedRegion]);
-  const selectedCountry = countries.includes(country) ? country : countries.find((item) => countryKey(item) === "thailand") ?? countries[0] ?? "";
-  const currentRows = useMemo(() => rows.filter((row) => row.round === round && row.survey === selectedCountry), [rows, round, selectedCountry]);
+  const countryNames = useMemo(() => unique(rows.filter((row) => row.round === round && row.region === selectedRegion).map((row) => row.survey)).sort(), [rows, round, selectedRegion]);
+  const countries = useMemo(() => [ALL_COUNTRIES, ...countryNames], [countryNames]);
+  const selectedCountry = country === ALL_COUNTRIES || countryNames.includes(country) ? country : countryNames.find((item) => countryKey(item) === "thailand") ?? countryNames[0] ?? ALL_COUNTRIES;
+  const currentRows = useMemo(() => rows.filter((row) => row.round === round && (selectedCountry === ALL_COUNTRIES ? row.region === selectedRegion : row.survey === selectedCountry)), [rows, round, selectedCountry, selectedRegion]);
   const contentTitles = useMemo(() => unique(currentRows.map((row) => row.contentTitle)), [currentRows]);
   const selectedQuestionnaire = contentTitles.includes(questionnaire)
     ? questionnaire
@@ -252,21 +257,40 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
     const currentRoundIndex = ROUND_ORDER.indexOf(round);
     const previousRound = ROUND_ORDER[currentRoundIndex + 1];
     const matchKey = countryKey(selectedCountry);
-    const previousRows = rows.filter((row) => row.round === previousRound && countryKey(row.survey) === matchKey);
+    const previousRows = rows.filter((row) => row.round === previousRound && (selectedCountry === ALL_COUNTRIES ? row.region === selectedRegion : countryKey(row.survey) === matchKey));
     const currentMap = new Map(currentRows.map((row) => [`${row.contentTitle}||${row.question}`, row.include]));
     const previousMap = new Map(previousRows.map((row) => [`${row.contentTitle}||${row.question}`, row.include]));
     const keys = unique([...currentMap.keys(), ...previousMap.keys()]);
     const added = keys.filter((key) => (currentMap.get(key) ?? 0) === 1 && (previousMap.get(key) ?? 0) === 0).length;
     const removed = keys.filter((key) => (currentMap.get(key) ?? 0) === 0 && (previousMap.get(key) ?? 0) === 1).length;
     return { total, included, coverage: percent(included, total), added, removed, previousRound };
-  }, [selectedCountry, currentRows, round, rows]);
+  }, [selectedCountry, selectedRegion, currentRows, round, rows]);
 
-  const topicCoverage = useMemo(() => contentTitles.slice(0, 5).map((contentTitle) => {
-    const topicRows = currentRows.filter((row) => row.contentTitle === contentTitle);
-    const total = unique(topicRows.map((row) => row.question)).length;
-    const included = unique(topicRows.filter((row) => row.include === 1).map((row) => row.question)).length;
-    return { name: shortContentTitle(contentTitle), total, included, coverage: percent(included, total) };
-  }), [contentTitles, currentRows]);
+  const topicCoverage = useMemo(() => {
+    const roundRows = rows.filter((row) => row.round === round);
+    const regionRows = roundRows.filter((row) => row.region === selectedRegion);
+    const comparisonSource = comparisonMode === "All MICS countries" || comparisonMode === "Median of MICS countries" ? roundRows : regionRows;
+
+    return contentTitles.slice(0, 5).map((contentTitle) => {
+      const topicRows = currentRows.filter((row) => row.contentTitle === contentTitle);
+      const total = unique(topicRows.map((row) => row.question)).length;
+      const included = unique(topicRows.filter((row) => row.include === 1).map((row) => row.question)).length;
+      const selectedCoverage = selectedCountry === ALL_COUNTRIES ? null : percent(included, total);
+      const comparisonCountries = unique(comparisonSource.map((row) => row.survey));
+      const countryValues = comparisonCountries.map((survey) => {
+        const surveyRows = comparisonSource.filter((row) => row.survey === survey && row.contentTitle === contentTitle);
+        const surveyTotal = unique(surveyRows.map((row) => row.question)).length;
+        const surveyIncluded = unique(surveyRows.filter((row) => row.include === 1).map((row) => row.question)).length;
+        return surveyTotal ? { country: survey, coverage: percent(surveyIncluded, surveyTotal) } : null;
+      }).filter(Boolean) as { country: string; coverage: number }[];
+      const isMedian = comparisonMode === "Median of region" || comparisonMode === "Median of MICS countries";
+      const comparisonMarkers = isMedian
+        ? [{ country: comparisonMode, coverage: median(countryValues.map((item) => item.coverage)) }]
+        : countryValues.filter((item) => selectedCountry === ALL_COUNTRIES || item.country !== selectedCountry);
+
+      return { name: shortContentTitle(contentTitle), total, included, coverage: percent(included, total), selectedCoverage, comparisonMarkers };
+    });
+  }, [contentTitles, currentRows, rows, round, selectedRegion, selectedCountry, comparisonMode]);
 
   const matrixQuestions = useMemo(() => unique(currentRows.filter((row) => row.contentTitle === selectedQuestionnaire).map((row) => row.question)).slice(0, 14), [currentRows, selectedQuestionnaire]);
   const matchKey = countryKey(selectedCountry);
@@ -309,8 +333,11 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
       </div>
 
       <section className="dashboard-section">
-        <h2>Topic coverage</h2>
-        <p className="section-note">Questions included in the selected country survey, grouped by questionnaire.</p>
+        <div className="section-title-row topic-title-row">
+          <h2>Topic coverage</h2>
+          <SelectControl label="Compare with" value={comparisonMode} values={COMPARISON_OPTIONS} onChange={(value) => setComparisonMode(value as ComparisonMode)} ariaLabel="Topic coverage comparison" />
+        </div>
+        <p className="section-note">The blue line shows the selected country. Dark-gray lines show the selected comparison group.</p>
         <div className="coverage-head country-coverage-head"><span>Topics</span><span>% coverage</span></div>
         <div className="coverage-table country-coverage">
           {topicCoverage.map((item) => (
@@ -319,16 +346,33 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
               <DataTooltip block text={`${item.name}: ${item.included} of ${item.total} questions included (${item.coverage}%)`}>
                 <div className="single-bar"><i style={{ width: `${item.coverage}%` }} /></div>
               </DataTooltip>
-              <div className="dot-range">
-                <i tabIndex={0} aria-label={`Total questions ${item.total}`} data-tooltip={`Total questions: ${item.total}`} className="dot dot-gray has-tooltip" style={{ left: "100%" }} />
-                <i tabIndex={0} aria-label={`Questions included ${item.included}, ${item.coverage}%`} data-tooltip={`Included: ${item.included} of ${item.total} (${item.coverage}%)`} className="dot dot-blue has-tooltip" style={{ left: `${item.coverage}%` }} />
+              <div className="country-comparison-range" aria-label={`${item.name} country comparison`}>
+                {item.comparisonMarkers.map((marker, index) => (
+                  <i
+                    key={`${marker.country}-${index}`}
+                    tabIndex={0}
+                    aria-label={`${marker.country}: ${marker.coverage}%`}
+                    data-tooltip={`${marker.country}: ${marker.coverage}%`}
+                    className="comparison-marker has-tooltip"
+                    style={{ left: `${clamp(marker.coverage)}%` }}
+                  />
+                ))}
+                {item.selectedCoverage !== null && (
+                  <i
+                    tabIndex={0}
+                    aria-label={`${selectedCountry}: ${item.selectedCoverage}%`}
+                    data-tooltip={`${selectedCountry}: ${item.selectedCoverage}%`}
+                    className={`selected-country-marker has-tooltip ${item.selectedCoverage >= 95 ? "at-right" : ""}`}
+                    style={{ left: `${clamp(item.selectedCoverage)}%` }}
+                  ><span>{item.selectedCoverage}%</span></i>
+                )}
               </div>
             </div>
           ))}
         </div>
-        <div className="legend country-legend">
-          <span><i className="line-key" />Total questions</span>
-          <span><i className="dot dot-blue" />Total questions included in survey</span>
+        <div className="legend country-legend comparison-legend">
+          {selectedCountry !== ALL_COUNTRIES && <span><i className="line-marker-key selected-country-key" />Selected country</span>}
+          <span><i className="line-marker-key comparison-country-key" />{comparisonMode.startsWith("Median") ? "Comparison median" : "Comparison countries"}</span>
         </div>
       </section>
 
