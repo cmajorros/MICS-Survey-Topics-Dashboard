@@ -417,7 +417,7 @@ export function MicsDashboard() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/data/mics-question-include.json")
+    fetch("data/mics-question-include.json")
       .then((response) => {
         if (!response.ok) throw new Error("The MICS dataset could not be loaded.");
         return response.json() as Promise<Payload>;
