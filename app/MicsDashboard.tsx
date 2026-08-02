@@ -6,6 +6,7 @@ type MicsRow = {
   contentTitle: string;
   region: string;
   survey: string;
+  countryName: string;
   round: string;
   question: string;
   include: 0 | 1;
@@ -13,11 +14,13 @@ type MicsRow = {
 
 type Payload = { source: string; rows: MicsRow[] };
 type ViewName = "overview" | "country";
-type ComparisonMode = "All MICS countries" | "All countries in the same region" | "Median of region" | "Median of MICS countries";
+type ComparisonMode = "All surveys in the same round" | "All survey in the same regions" | "Median of the country" | "Median of region" | "Median of MICS countries";
 
 const ROUND_ORDER = ["MICS 6", "MICS 5", "MICS 4", "MICS 3", "MICS 2"];
+const ALL_REGIONS = "All regions";
 const ALL_COUNTRIES = "All countries";
-const COMPARISON_OPTIONS: ComparisonMode[] = ["All MICS countries", "All countries in the same region", "Median of region", "Median of MICS countries"];
+const ALL_SURVEYS = "All surveys";
+const COMPARISON_OPTIONS: ComparisonMode[] = ["All surveys in the same round", "All survey in the same regions", "Median of the country", "Median of region", "Median of MICS countries"];
 const BLUE = "#22a9d6";
 
 const unique = (values: string[]) => [...new Set(values.filter(Boolean))];
@@ -49,32 +52,34 @@ function shortContentTitle(value: string) {
     .replace(/^./, (character) => character.toUpperCase());
 }
 
-function SelectControl({ label, value, values, onChange, ariaLabel }: {
+function SelectControl({ label, value, values, onChange, ariaLabel, disabled = false }: {
   label: string;
   value: string;
   values: string[];
   onChange: (value: string) => void;
   ariaLabel?: string;
+  disabled?: boolean;
 }) {
   return (
     <label className="filter-control">
       <span>{label}</span>
-      <select aria-label={ariaLabel ?? label} value={value} onChange={(event) => onChange(event.target.value)}>
+      <select aria-label={ariaLabel ?? label} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
         {values.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
     </label>
   );
 }
 
-function MetricCard({ label, value, tone = "gray", note, children }: {
+function MetricCard({ label, value, tone = "gray", note, children, className = "" }: {
   label: string;
   value: string | number;
   tone?: "gray" | "cyan" | "navy" | "pale";
   note?: string;
   children?: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <article className={`metric-card metric-${tone}`}>
+    <article className={`metric-card metric-${tone}${className ? ` ${className}` : ""}`}>
       <h3>{label}</h3>
       <strong>{value}</strong>
       {note && <p>{note}</p>}
@@ -95,26 +100,74 @@ function DataTooltip({ text, children, block = false }: { text: string; children
   );
 }
 
+function InfoButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return <button className="info-button" type="button" aria-label={label} title={label} onClick={onClick}>i</button>;
+}
+
+function InfoModal({ id, title, onClose, children }: { id: string; title: string; onClose: () => void; children: React.ReactNode }) {
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [onClose]);
+
+  return (
+    <div className="info-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+      <section className="info-modal" role="dialog" aria-modal="true" aria-labelledby={id}>
+        <header className="info-modal-header">
+          <div><span>Dashboard guide</span><h2 id={id}>{title}</h2></div>
+          <button className="info-modal-close" type="button" onClick={onClose} aria-label="Close dashboard guide">×</button>
+        </header>
+        <div className="info-modal-content">{children}</div>
+      </section>
+    </div>
+  );
+}
+
 function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: string; setRound: (round: string) => void }) {
   const filtered = useMemo(() => rows.filter((row) => row.round === round), [rows, round]);
   const contentTitles = useMemo(() => unique(filtered.map((row) => row.contentTitle)), [filtered]);
   const [questionnaire, setQuestionnaire] = useState("");
+  const [showInfo, setShowInfo] = useState(false);
   const selectedQuestionnaire = contentTitles.includes(questionnaire)
     ? questionnaire
     : contentTitles.find((title) => /household/i.test(title)) ?? contentTitles[0] ?? "";
 
   const metrics = useMemo(() => {
     const topics = unique(filtered.map((row) => row.question)).length;
-    const bySurvey = new Map<string, Set<string>>();
-    filtered.filter((row) => row.include === 1).forEach((row) => {
-      if (!bySurvey.has(row.survey)) bySurvey.set(row.survey, new Set());
-      bySurvey.get(row.survey)?.add(row.question);
+    const countryStatistics = unique(filtered.map((row) => row.countryName)).map((countryName) => {
+      const countryRows = filtered.filter((row) => row.countryName === countryName);
+      const includedTopics = unique(countryRows.filter((row) => row.include === 1).map((row) => row.question));
+      return {
+        included: includedTopics.length,
+        percentage: percent(includedTopics.length, topics),
+      };
     });
+    const countryPercentages = countryStatistics.map((item) => item.percentage);
+    const countries = unique(filtered.map((row) => row.countryName));
+    const surveys = unique(filtered.map((row) => row.survey));
+    const includedCountryTopicPairs = new Set(
+      filtered
+        .filter((row) => row.include === 1)
+        .map((row) => `${row.countryName}||${row.question}`),
+    );
     return {
       topics,
-      medianIncluded: median([...bySurvey.values()].map((questions) => questions.size)),
-      coverage: percent(filtered.filter((row) => row.include === 1).length, filtered.length),
-      countries: unique(filtered.map((row) => row.survey)).length,
+      coverage: percent(includedCountryTopicPairs.size, topics * countries.length),
+      countries: countries.length,
+      surveys: surveys.length,
+      averageIncluded: countries.length ? Math.round(includedCountryTopicPairs.size / countries.length) : 0,
+      minimumIncluded: countryStatistics.length ? Math.min(...countryStatistics.map((item) => item.included)) : 0,
+      maximumIncluded: countryStatistics.length ? Math.max(...countryStatistics.map((item) => item.included)) : 0,
+      medianCountryIncluded: median(countryStatistics.map((item) => item.included)),
+      minimumPercentage: countryPercentages.length ? Math.min(...countryPercentages) : 0,
+      maximumPercentage: countryPercentages.length ? Math.max(...countryPercentages) : 0,
+      medianPercentage: median(countryPercentages),
     };
   }, [filtered]);
 
@@ -133,12 +186,12 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
       const questionRows = filtered.filter((row) => row.question === question);
       const regionalRates = unique(questionRows.map((row) => row.region)).map((region) => {
         const regionRows = questionRows.filter((row) => row.region === region);
-        const regionCountries = unique(regionRows.map((row) => row.survey));
-        const includedCountries = regionCountries.filter((survey) => regionRows.some((row) => row.survey === survey && row.include === 1));
+        const regionCountries = unique(regionRows.map((row) => row.countryName));
+        const includedCountries = regionCountries.filter((countryName) => regionRows.some((row) => row.countryName === countryName && row.include === 1));
         return percent(includedCountries.length, regionCountries.length);
       });
-      const countries = unique(questionRows.map((row) => row.survey));
-      const includedCountries = countries.filter((survey) => questionRows.some((row) => row.survey === survey && row.include === 1));
+      const countries = unique(questionRows.map((row) => row.countryName));
+      const includedCountries = countries.filter((countryName) => questionRows.some((row) => row.countryName === countryName && row.include === 1));
       return {
         question,
         totalCountries: countries.length,
@@ -155,32 +208,65 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
     const source = filtered.filter((row) => row.contentTitle === selectedQuestionnaire);
     return unique(source.map((row) => row.question)).slice(0, 10).map((question) => {
       const questionRows = source.filter((row) => row.question === question);
-      const included = questionRows.filter((row) => row.include === 1).length;
-      return { question, included, total: questionRows.length, coverage: percent(included, questionRows.length) };
+      const countries = unique(questionRows.map((row) => row.countryName));
+      const included = countries.filter((countryName) => questionRows.some((row) => row.countryName === countryName && row.include === 1)).length;
+      return { question, included, total: countries.length, coverage: percent(included, countries.length) };
     });
   }, [filtered, selectedQuestionnaire]);
 
   return (
     <section aria-labelledby="overview-title">
       <div className="view-heading">
-        <h1 id="overview-title">Overall</h1>
+        <div className="title-with-info">
+          <h1 id="overview-title">Overall</h1>
+          <InfoButton label="Open guide to Overview calculations" onClick={() => setShowInfo(true)} />
+        </div>
         <SelectControl label="Content from" value={round} values={ROUND_ORDER} onChange={setRound} ariaLabel="MICS round" />
       </div>
 
-      <div className="hero-grid">
-        <div className="metric-grid">
-          <MetricCard label="Topics" value={metrics.topics} />
-          <MetricCard label="Median Topics Included on survey" value={metrics.medianIncluded} tone="cyan" />
-          <MetricCard label="Coverage" value={`${metrics.coverage}%`} tone="navy" note="Topics included on survey / Total topics" />
-          <MetricCard label="Total participated countries" value={metrics.countries} tone="pale" />
+      {showInfo && <InfoModal id="overview-guide-title" title="How the Overview is calculated" onClose={() => setShowInfo(false)}>
+        <p className="methodology-intro">All values use records from the MICS round selected under <strong>Content from</strong>. A topic/module is included when its <strong>Include</strong> value is 1.</p>
+        <div className="methodology-grid">
+          <section className="methodology-card"><h3>Headline metrics</h3><ul>
+            <li><strong>Topics/Modules:</strong> distinct topic/module names in the selected round.</li>
+            <li><strong>Total participated countries:</strong> distinct cleaned Country Name values. Multiple surveys from one country count once.</li>
+            <li><strong>Total surveys:</strong> distinct Survey values, including national and subnational surveys.</li>
+          </ul></section>
+          <section className="methodology-card"><h3>Overall percentage</h3>
+            <p>Each country-topic pair counts once. If any survey for a country includes a topic/module, that pair is included.</p>
+            <div className="formula-box"><strong>Included country-topic pairs</strong><span>÷</span><strong>Topics/modules × countries</strong><span>× 100</span></div>
+            <p>The absolute number beneath the percentage is the average included topics/modules per country.</p>
+          </section>
+          <section className="methodology-card"><h3>Minimum, maximum and median</h3><p>Each country’s percentage is its distinct included topics/modules divided by all topics/modules in the selected round. The cards summarize those country percentages; their notes show absolute topic/module counts.</p></section>
+          <section className="methodology-card"><h3>Coverage by topic/module</h3><p>The orange bar shows countries including the topic out of countries with a record for it. Regional rates use the same calculation. Orange, black and blue vertical lines are the regional minimum, median and maximum; equal values intentionally overlap.</p></section>
+          <section className="methodology-card methodology-wide"><h3>Questions coverage</h3><p>For the selected questionnaire, each bar divides distinct countries including the question by distinct countries with a record for it. Hover or focus a mark for the numerator, denominator and percentage.</p></section>
         </div>
-        <PhotoPanel />
+      </InfoModal>}
+
+      <div className="overview-top-grid">
+        <div className="overview-primary-grid">
+          <MetricCard label="Topics/Modules" value={metrics.topics} />
+          <MetricCard label="Total participated countries" value={metrics.countries} tone="pale" />
+          <MetricCard label="Total surveys" value={metrics.surveys} tone="gray" />
+          <PhotoPanel />
+        </div>
+
+        <section className="summary-statistics" aria-labelledby="percentage-summary-title">
+          <h2 id="percentage-summary-title">Percent topics/modules survey included in survey</h2>
+          <p>Distribution across participating countries in the selected MICS round.</p>
+          <div className="coverage-stat-grid">
+            <MetricCard label="Percent topics/modules survey included in survey" value={`${metrics.coverage}%`} tone="navy" note={`${metrics.averageIncluded} of ${metrics.topics} topics/modules included per country`} />
+            <MetricCard label="Minimum" value={`${metrics.minimumPercentage}%`} note={`${metrics.minimumIncluded} of ${metrics.topics} topics/modules included`} />
+            <MetricCard label="Maximum" value={`${metrics.maximumPercentage}%`} tone="cyan" note={`${metrics.maximumIncluded} of ${metrics.topics} topics/modules included`} />
+            <MetricCard label="Median" value={`${metrics.medianPercentage}%`} tone="navy" note={`${metrics.medianCountryIncluded} of ${metrics.topics} topics/modules included`} />
+          </div>
+        </section>
       </div>
 
       <section className="dashboard-section">
-        <h2>Coverage by topic</h2>
-        <p className="section-note">Regional minimum, median and maximum coverage. Hover or focus any mark for its exact value.</p>
-        <div className="coverage-head"><span>Total countries</span><span>% coverage</span></div>
+        <h2>Percent topics/modules survey included in survey by topic/module</h2>
+        <p className="section-note">Regional minimum, median and maximum percentages. Hover or focus any mark for its exact value.</p>
+        <div className="coverage-head"><span>Total countries</span><span>Percent topics/modules survey included in survey</span></div>
         <div className="coverage-table">
           {coverageRows.map((item) => {
             return <div className="coverage-row" key={item.question}>
@@ -235,75 +321,104 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
 
 function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string; setRound: (round: string) => void }) {
   const regions = useMemo(() => unique(rows.filter((row) => row.round === round).map((row) => row.region)).sort(), [rows, round]);
+  const regionOptions = useMemo(() => [ALL_REGIONS, ...regions], [regions]);
   const [region, setRegion] = useState("");
   const [country, setCountry] = useState("");
-  const [questionnaire, setQuestionnaire] = useState("");
-  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("All countries in the same region");
-  const selectedRegion = regions.includes(region)
+  const [survey, setSurvey] = useState("");
+  const [comparisonMode, setComparisonMode] = useState<ComparisonMode>("All survey in the same regions");
+  const [showInfo, setShowInfo] = useState(false);
+  const selectedRegion = region === ALL_REGIONS || regions.includes(region)
     ? region
-    : rows.find((row) => row.round === round && countryKey(row.survey) === "thailand")?.region ?? regions[0] ?? "";
-  const countryNames = useMemo(() => unique(rows.filter((row) => row.round === round && row.region === selectedRegion).map((row) => row.survey)).sort(), [rows, round, selectedRegion]);
+    : rows.find((row) => row.round === round && row.countryName === "Thailand")?.region ?? regions[0] ?? "";
+  const regionRows = useMemo(() => rows.filter((row) => row.round === round && (selectedRegion === ALL_REGIONS || row.region === selectedRegion)), [rows, round, selectedRegion]);
+  const countryNames = useMemo(() => unique(regionRows.map((row) => row.countryName)).sort(), [regionRows]);
   const countries = useMemo(() => [ALL_COUNTRIES, ...countryNames], [countryNames]);
-  const selectedCountry = country === ALL_COUNTRIES || countryNames.includes(country) ? country : countryNames.find((item) => countryKey(item) === "thailand") ?? countryNames[0] ?? ALL_COUNTRIES;
-  const currentRows = useMemo(() => rows.filter((row) => row.round === round && (selectedCountry === ALL_COUNTRIES ? row.region === selectedRegion : row.survey === selectedCountry)), [rows, round, selectedCountry, selectedRegion]);
+  const selectedCountry = country === ALL_COUNTRIES || countryNames.includes(country) ? country : countryNames.find((item) => item === "Thailand") ?? countryNames[0] ?? ALL_COUNTRIES;
+  const countryRows = useMemo(() => regionRows.filter((row) => selectedCountry === ALL_COUNTRIES || row.countryName === selectedCountry), [regionRows, selectedCountry]);
+  const surveyNames = useMemo(() => unique(countryRows.map((row) => row.survey)).sort(), [countryRows]);
+  const surveys = useMemo(() => [ALL_SURVEYS, ...surveyNames], [surveyNames]);
+  const selectedSurvey = survey === ALL_SURVEYS || surveyNames.includes(survey) ? survey : surveyNames.find((item) => countryKey(item) === "thailand") ?? surveyNames[0] ?? ALL_SURVEYS;
+  const surveyTableRows = selectedSurvey === ALL_SURVEYS ? surveyNames : [selectedSurvey];
+  const currentRows = useMemo(() => countryRows.filter((row) => selectedSurvey === ALL_SURVEYS || row.survey === selectedSurvey), [countryRows, selectedSurvey]);
+  const restrictComparisonToAllMics = selectedRegion === ALL_REGIONS || (selectedCountry === ALL_COUNTRIES && selectedSurvey === ALL_SURVEYS);
+  const comparisonOptions = useMemo<ComparisonMode[]>(() => restrictComparisonToAllMics ? ["All surveys in the same round"] : COMPARISON_OPTIONS, [restrictComparisonToAllMics]);
+  const selectedComparisonMode: ComparisonMode = comparisonOptions.includes(comparisonMode) ? comparisonMode : "All surveys in the same round";
+  const selectedSeriesLabel = selectedSurvey !== ALL_SURVEYS
+    ? selectedSurvey
+    : selectedCountry !== ALL_COUNTRIES
+      ? `${selectedCountry} — all surveys`
+      : selectedRegion !== ALL_REGIONS
+        ? `${selectedRegion} — all surveys`
+        : `${round} — all surveys`;
   const contentTitles = useMemo(() => unique(currentRows.map((row) => row.contentTitle)), [currentRows]);
-  const selectedQuestionnaire = contentTitles.includes(questionnaire)
-    ? questionnaire
-    : contentTitles.find((title) => /household/i.test(title)) ?? contentTitles[0] ?? "";
-
   const metrics = useMemo(() => {
     const total = unique(currentRows.map((row) => row.question)).length;
     const included = unique(currentRows.filter((row) => row.include === 1).map((row) => row.question)).length;
-    const currentRoundIndex = ROUND_ORDER.indexOf(round);
-    const previousRound = ROUND_ORDER[currentRoundIndex + 1];
-    const matchKey = countryKey(selectedCountry);
-    const previousRows = rows.filter((row) => row.round === previousRound && (selectedCountry === ALL_COUNTRIES ? row.region === selectedRegion : countryKey(row.survey) === matchKey));
-    const currentMap = new Map(currentRows.map((row) => [`${row.contentTitle}||${row.question}`, row.include]));
-    const previousMap = new Map(previousRows.map((row) => [`${row.contentTitle}||${row.question}`, row.include]));
-    const keys = unique([...currentMap.keys(), ...previousMap.keys()]);
-    const added = keys.filter((key) => (currentMap.get(key) ?? 0) === 1 && (previousMap.get(key) ?? 0) === 0).length;
-    const removed = keys.filter((key) => (currentMap.get(key) ?? 0) === 0 && (previousMap.get(key) ?? 0) === 1).length;
-    return { total, included, coverage: percent(included, total), added, removed, previousRound };
-  }, [selectedCountry, selectedRegion, currentRows, round, rows]);
+    return { total, included, coverage: percent(included, total), surveyCount: surveyNames.length };
+  }, [currentRows, surveyNames]);
+
+  const coverageSummary = useMemo(() => {
+    const surveyStatistics = surveyNames.map((surveyName) => {
+      const surveyRows = countryRows.filter((row) => row.survey === surveyName);
+      const total = unique(surveyRows.map((row) => row.question)).length;
+      const included = unique(surveyRows.filter((row) => row.include === 1).map((row) => row.question)).length;
+      return { included, total, percentage: percent(included, total) };
+    }).filter((item) => item.total > 0);
+    const percentages = surveyStatistics.map((item) => item.percentage);
+    const includedCounts = surveyStatistics.map((item) => item.included);
+    return {
+      minimumPercentage: percentages.length ? Math.min(...percentages) : 0,
+      maximumPercentage: percentages.length ? Math.max(...percentages) : 0,
+      medianPercentage: median(percentages),
+      minimumIncluded: includedCounts.length ? Math.min(...includedCounts) : 0,
+      maximumIncluded: includedCounts.length ? Math.max(...includedCounts) : 0,
+      medianIncluded: median(includedCounts),
+    };
+  }, [countryRows, surveyNames]);
 
   const topicCoverage = useMemo(() => {
     const roundRows = rows.filter((row) => row.round === round);
-    const regionRows = roundRows.filter((row) => row.region === selectedRegion);
-    const comparisonSource = comparisonMode === "All MICS countries" || comparisonMode === "Median of MICS countries" ? roundRows : regionRows;
+    const roundRegionRows = roundRows.filter((row) => selectedRegion === ALL_REGIONS || row.region === selectedRegion);
+    const sameCountryRows = roundRows.filter((row) => selectedCountry === ALL_COUNTRIES ? row.region === selectedRegion : row.countryName === selectedCountry);
+    const comparisonSource = selectedComparisonMode === "Median of the country"
+      ? sameCountryRows
+      : selectedComparisonMode === "All surveys in the same round" || selectedComparisonMode === "Median of MICS countries"
+        ? roundRows
+        : roundRegionRows;
 
     return contentTitles.slice(0, 5).map((contentTitle) => {
       const topicRows = currentRows.filter((row) => row.contentTitle === contentTitle);
       const total = unique(topicRows.map((row) => row.question)).length;
       const included = unique(topicRows.filter((row) => row.include === 1).map((row) => row.question)).length;
-      const selectedCoverage = selectedCountry === ALL_COUNTRIES ? null : percent(included, total);
+      const selectedCoverage = total ? percent(included, total) : null;
       const comparisonCountries = unique(comparisonSource.map((row) => row.survey));
       const countryValues = comparisonCountries.map((survey) => {
         const surveyRows = comparisonSource.filter((row) => row.survey === survey && row.contentTitle === contentTitle);
         const surveyTotal = unique(surveyRows.map((row) => row.question)).length;
         const surveyIncluded = unique(surveyRows.filter((row) => row.include === 1).map((row) => row.question)).length;
-        return surveyTotal ? { country: survey, coverage: percent(surveyIncluded, surveyTotal) } : null;
-      }).filter(Boolean) as { country: string; coverage: number }[];
-      const isMedian = comparisonMode === "Median of region" || comparisonMode === "Median of MICS countries";
+        return surveyTotal ? { country: survey, countryName: surveyRows[0]?.countryName ?? "", coverage: percent(surveyIncluded, surveyTotal) } : null;
+      }).filter(Boolean) as { country: string; countryName: string; coverage: number }[];
+      const isMedian = selectedComparisonMode === "Median of the country" || selectedComparisonMode === "Median of region" || selectedComparisonMode === "Median of MICS countries";
       const comparisonMarkers = isMedian
-        ? [{ country: comparisonMode, coverage: median(countryValues.map((item) => item.coverage)) }]
-        : countryValues.filter((item) => selectedCountry === ALL_COUNTRIES || item.country !== selectedCountry);
+        ? [{ country: selectedComparisonMode, countryName: "", coverage: median(countryValues.map((item) => item.coverage)) }]
+        : countryValues.filter((item) => selectedSurvey === ALL_SURVEYS || item.country !== selectedSurvey);
+      const overlappingComparisons = selectedCoverage === null
+        ? []
+        : comparisonMarkers.filter((item) => item.coverage === selectedCoverage).map((item) => item.country);
 
-      return { name: shortContentTitle(contentTitle), total, included, coverage: percent(included, total), selectedCoverage, comparisonMarkers };
+      return { name: shortContentTitle(contentTitle), total, included, coverage: percent(included, total), selectedCoverage, comparisonMarkers, overlappingComparisons };
     });
-  }, [contentTitles, currentRows, rows, round, selectedRegion, selectedCountry, comparisonMode]);
-
-  const matrixQuestions = useMemo(() => unique(currentRows.filter((row) => row.contentTitle === selectedQuestionnaire).map((row) => row.question)).slice(0, 14), [currentRows, selectedQuestionnaire]);
-  const matchKey = countryKey(selectedCountry);
+  }, [contentTitles, currentRows, rows, round, selectedRegion, selectedCountry, selectedSurvey, selectedComparisonMode]);
 
   function downloadCsv() {
-    const header = ["Content Title", "Region", "Survey", "MICS Round", "Question", "Include"];
+    const header = ["Content Title", "Region", "Survey", "Country Name", "MICS Round", "Question", "Include"];
     const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
-    const csv = [header, ...currentRows.map((row) => [row.contentTitle, row.region, row.survey, row.round, row.question, row.include])]
+    const csv = [header, ...currentRows.map((row) => [row.contentTitle, row.region, row.survey, row.countryName, row.round, row.question, row.include])]
       .map((line) => line.map(escape).join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${selectedCountry.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${round.toLowerCase().replace(" ", "-")}-mics-content.csv`;
+    link.download = `${selectedSurvey.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-${round.toLowerCase().replace(" ", "-")}-mics-content.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -311,34 +426,70 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
   return (
     <section aria-labelledby="country-title">
       <div className="view-heading country-heading">
-        <h1 id="country-title">{selectedCountry || "Country"}</h1>
+        <div className="title-with-info">
+          <h1 id="country-title">{selectedSurvey !== ALL_SURVEYS ? selectedSurvey : selectedCountry || "Country"}</h1>
+          <InfoButton label="Open guide to Country view calculations" onClick={() => setShowInfo(true)} />
+        </div>
         <div className="filter-row">
-          <SelectControl label="Region" value={selectedRegion} values={regions} onChange={setRegion} />
-          <SelectControl label="Country" value={selectedCountry} values={countries} onChange={setCountry} />
+          <SelectControl label="Region" value={selectedRegion} values={regionOptions} onChange={(value) => { setRegion(value); setCountry(""); setSurvey(""); }} />
+          <SelectControl label="Country" value={selectedCountry} values={countries} onChange={(value) => { setCountry(value); setSurvey(""); }} />
+          <SelectControl label="Survey" value={selectedSurvey} values={surveys} onChange={setSurvey} />
           <SelectControl label="Content from" value={round} values={ROUND_ORDER} onChange={setRound} ariaLabel="MICS round" />
-          <button className="download-button" type="button" onClick={downloadCsv}>Download data</button>
+          <button className="download-button" type="button" onClick={downloadCsv}>Download summary data</button>
         </div>
       </div>
 
-      <div className="hero-grid">
-        <div className="metric-grid">
-          <MetricCard label="Questions" value={metrics.total} />
-          <MetricCard label="Topics Included on survey" value={metrics.included} tone="cyan" />
-          <MetricCard label="Coverage" value={`${metrics.coverage}%`} tone="navy" note="Topics included on survey / Total topics" />
-          <MetricCard label="Change from previous round" value={`+${metrics.added}/-${metrics.removed}`} tone="pale">
-            <div className="change-labels"><span>added</span><span>removed</span></div>
-          </MetricCard>
+      {showInfo && <InfoModal id="country-guide-title" title="How the Country view is calculated" onClose={() => setShowInfo(false)}>
+        <p className="methodology-intro">The top filters apply in order: <strong>MICS round → region → country → survey</strong>. “All” keeps every matching record at that level. A topic/module is included when <strong>Include</strong> equals 1.</p>
+        <div className="methodology-grid">
+          <section className="methodology-card"><h3>Headline metrics</h3><ul>
+            <li><strong>Total topics/modules:</strong> distinct topics/modules in the active selection.</li>
+            <li><strong>Topics/Modules included:</strong> distinct active topics/modules with Include = 1.</li>
+            <li><strong>Surveys in selection:</strong> distinct Survey values matching the round, region and country filters.</li>
+          </ul></section>
+          <section className="methodology-card"><h3>Selected percentage</h3>
+            <div className="formula-box"><strong>Distinct included topics/modules</strong><span>÷</span><strong>Distinct topics/modules in selection</strong><span>× 100</span></div>
+            <p>Minimum, maximum and median summarize the individual surveys available within the selected country or selection. Notes show absolute included counts.</p>
+          </section>
+          <section className="methodology-card methodology-wide"><h3>Topic/module comparison chart</h3><p>For each questionnaire topic/module, coverage is included questions divided by all questions in that topic/module. The <strong>blue line</strong> is the active top-filter selection. Thin dark-gray lines are comparison surveys. Equal values intentionally overlap, and the tooltip lists overlapping surveys.</p></section>
+          <section className="methodology-card methodology-wide"><h3>Compare with options</h3>
+            <dl className="comparison-definitions">
+              <div><dt>All surveys in the same round</dt><dd>One comparison line for every survey in the selected MICS round.</dd></div>
+              <div><dt>All survey in the same regions</dt><dd>One line for every survey in the selected region, including other surveys from the selected country.</dd></div>
+              <div><dt>Median of the country</dt><dd>One median line across all national and subnational surveys sharing the selected Country Name.</dd></div>
+              <div><dt>Median of region</dt><dd>One median line calculated from individual survey percentages in the selected region.</dd></div>
+              <div><dt>Median of MICS countries</dt><dd>One median line calculated from all individual survey percentages in the selected round.</dd></div>
+            </dl>
+          </section>
+          <section className="methodology-card methodology-wide"><h3>Availability rules and survey table</h3><p>With <strong>All regions</strong>, comparison is fixed to all surveys in the same round. When both <strong>All countries</strong> and <strong>All surveys</strong> are selected, only that round-wide comparison is offered. The bottom table lists distinct surveys matching the top filters.</p></section>
         </div>
+      </InfoModal>}
+
+      <div className="metric-grid country-primary-grid">
+        <MetricCard label="Total topics/modules" value={metrics.total} />
+        <MetricCard label="Topics/Modules included in survey" value={metrics.included} tone="cyan" />
+        <MetricCard label={selectedCountry === ALL_COUNTRIES ? "Surveys in selection" : "Surveys in selected country"} value={metrics.surveyCount} tone="navy" />
         <PhotoPanel country />
       </div>
 
+      <section className="summary-statistics country-summary-statistics" aria-labelledby="country-percentage-summary-title">
+        <h2 id="country-percentage-summary-title">Percent topics/modules survey included in survey</h2>
+        <p>{selectedCountry === ALL_COUNTRIES ? "Distribution across surveys in the selected region." : "Distribution across surveys and subnational surveys in the selected country."}</p>
+        <div className="coverage-stat-grid">
+          <MetricCard label={selectedSurvey === ALL_SURVEYS ? "All selected surveys" : "Selected survey"} value={`${metrics.coverage}%`} tone="navy" note={`${metrics.included} of ${metrics.total} topics/modules included`} />
+          <MetricCard label="Minimum" value={`${coverageSummary.minimumPercentage}%`} note={`${coverageSummary.minimumIncluded} topics/modules included`} />
+          <MetricCard label="Maximum" value={`${coverageSummary.maximumPercentage}%`} tone="cyan" note={`${coverageSummary.maximumIncluded} topics/modules included`} />
+          <MetricCard label="Median" value={`${coverageSummary.medianPercentage}%`} tone="navy" note={`${coverageSummary.medianIncluded} topics/modules included`} />
+        </div>
+      </section>
+
       <section className="dashboard-section">
         <div className="section-title-row topic-title-row">
-          <h2>Topic coverage</h2>
-          <SelectControl label="Compare with" value={comparisonMode} values={COMPARISON_OPTIONS} onChange={(value) => setComparisonMode(value as ComparisonMode)} ariaLabel="Topic coverage comparison" />
+          <h2>Percent topics/modules survey included in survey</h2>
+          <SelectControl label="Compare with" value={selectedComparisonMode} values={comparisonOptions} disabled={selectedRegion === ALL_REGIONS} onChange={(value) => setComparisonMode(value as ComparisonMode)} ariaLabel="Topic coverage comparison" />
         </div>
-        <p className="section-note">The blue line shows the selected country. Dark-gray lines show the selected comparison group.</p>
-        <div className="coverage-head country-coverage-head"><span>Topics</span><span>% coverage</span></div>
+        <p className="section-note">The blue line shows the active survey, country, region or round selection. Dark-gray lines show the selected comparison group.</p>
+        <div className="coverage-head country-coverage-head"><span>Topics/Modules</span><span>Percent topics/modules survey included in survey</span></div>
         <div className="coverage-table country-coverage">
           {topicCoverage.map((item) => (
             <div className="coverage-row" key={item.name}>
@@ -353,16 +504,16 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
                     tabIndex={0}
                     aria-label={`${marker.country}: ${marker.coverage}%`}
                     data-tooltip={`${marker.country}: ${marker.coverage}%`}
-                    className="comparison-marker has-tooltip"
+                    className={`comparison-marker has-tooltip${selectedCountry !== ALL_COUNTRIES && marker.countryName === selectedCountry ? " same-country-comparison-marker" : ""}`}
                     style={{ left: `${clamp(marker.coverage)}%` }}
                   />
                 ))}
                 {item.selectedCoverage !== null && (
                   <i
                     tabIndex={0}
-                    aria-label={`${selectedCountry}: ${item.selectedCoverage}%`}
-                    data-tooltip={`${selectedCountry}: ${item.selectedCoverage}%`}
-                    className={`selected-country-marker has-tooltip ${item.selectedCoverage >= 95 ? "at-right" : ""}`}
+                    aria-label={`${selectedSeriesLabel}: ${item.selectedCoverage}%${item.overlappingComparisons.length ? `; overlapping comparison surveys: ${item.overlappingComparisons.join(", ")}` : ""}`}
+                    data-tooltip={`${selectedSeriesLabel}: ${item.selectedCoverage}%${item.overlappingComparisons.length ? ` · Same value: ${item.overlappingComparisons.join(", ")}` : ""}`}
+                    className={`selected-country-marker has-tooltip${item.overlappingComparisons.length ? " has-overlap" : ""} ${item.selectedCoverage >= 95 ? "at-right" : ""}`}
                     style={{ left: `${clamp(item.selectedCoverage)}%` }}
                   ><span>{item.selectedCoverage}%</span></i>
                 )}
@@ -371,41 +522,26 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
           ))}
         </div>
         <div className="legend country-legend comparison-legend">
-          {selectedCountry !== ALL_COUNTRIES && <span><i className="line-marker-key selected-country-key" />Selected country</span>}
-          <span><i className="line-marker-key comparison-country-key" />{comparisonMode.startsWith("Median") ? "Comparison median" : "Comparison countries"}</span>
+          <span><i className="line-marker-key selected-country-key" />Active selection</span>
+          <span><i className="line-marker-key comparison-country-key" />{selectedComparisonMode.startsWith("Median") ? "Comparison median" : "Comparison countries"}</span>
         </div>
       </section>
 
-      <section className="dashboard-section matrix-section">
-        <div className="section-title-row">
-          <h2>Question coverage</h2>
-          <SelectControl label="" value={selectedQuestionnaire} values={contentTitles} onChange={setQuestionnaire} ariaLabel="Questionnaire" />
+      <section className="dashboard-section survey-list-section" aria-labelledby="survey-list-title">
+        <div className="survey-list-heading">
+          <h2 id="survey-list-title">Surveys in current selection</h2>
+          <span>{surveyTableRows.length} {surveyTableRows.length === 1 ? "survey" : "surveys"}</span>
         </div>
-        <p className="section-note">Each dot represents this question’s status in a MICS round. Hover or focus to read the value.</p>
-        <div className="matrix-scroll" tabIndex={0} aria-label="Question coverage by MICS round">
-          <div className="matrix-grid matrix-header">
-            <b>Questions</b>
-            <b className="round-heading">MICS Round</b>
-            {ROUND_ORDER.map((item) => <span key={item}>{item.replace("MICS ", "")}</span>)}
-          </div>
-          {matrixQuestions.map((question) => (
-            <div className="matrix-grid" key={question}>
-              <span>{question}</span><i aria-hidden="true" />
-              {ROUND_ORDER.map((item) => {
-                const candidates = rows.filter((row) => row.round === item && countryKey(row.survey) === matchKey && row.contentTitle === selectedQuestionnaire && row.question === question);
-                const value = candidates[0]?.include;
-                const status = value === 1 ? "Included" : value === 0 ? "Not included" : "No record / Not conduct survey";
-                return <i key={item} tabIndex={0} aria-label={`${question}, ${item}: ${status}`} data-tooltip={`${item}: ${status}`} className={`matrix-dot has-tooltip ${value === 1 ? "included" : value === 0 ? "removed" : "missing"}`} />;
-              })}
-            </div>
-          ))}
-        </div>
-        <div className="legend matrix-legend">
-          <span><i className="dot dot-blue" />Include</span>
-          <span><i className="dot dot-orange" />Not included</span>
-          <span><i className="dot dot-gray" />No record / Not conduct survey</span>
+        <div className="survey-table-wrap">
+          <table className="survey-table">
+            <thead><tr><th scope="col">Survey</th></tr></thead>
+            <tbody>
+              {surveyTableRows.map((surveyName) => <tr key={surveyName}><td>{surveyName}</td></tr>)}
+            </tbody>
+          </table>
         </div>
       </section>
+
     </section>
   );
 }

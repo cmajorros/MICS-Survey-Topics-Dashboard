@@ -27,6 +27,7 @@ for values in sheet.iter_rows(min_row=2, values_only=True):
             "contentTitle": clean(record.get("Content Title")),
             "region": clean(record.get("Region")),
             "survey": clean(record.get("Survey")),
+            "countryName": clean(record.get("Country Name")),
             "round": clean(record.get("MICS Round")),
             "question": clean(record.get("Question")),
             "include": 1 if record.get("Include") == 1 else 0,
@@ -35,7 +36,7 @@ for values in sheet.iter_rows(min_row=2, values_only=True):
 
 payload = {
     "source": SOURCE.name,
-    "columns": ["contentTitle", "region", "survey", "round", "question", "include"],
+    "columns": ["contentTitle", "region", "survey", "countryName", "round", "question", "include"],
     "rows": rows,
 }
 
