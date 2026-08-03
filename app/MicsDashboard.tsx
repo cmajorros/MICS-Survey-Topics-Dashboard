@@ -465,23 +465,25 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
         </div>
       </InfoModal>}
 
-      <div className="metric-grid country-primary-grid">
-        <MetricCard label="Total topics/modules" value={metrics.total} />
-        <MetricCard label="Topics/Modules included in survey" value={metrics.included} tone="cyan" />
-        <MetricCard label={selectedCountry === ALL_COUNTRIES ? "Surveys in selection" : "Surveys in selected country"} value={metrics.surveyCount} tone="navy" />
-        <PhotoPanel country />
-      </div>
-
-      <section className="summary-statistics country-summary-statistics" aria-labelledby="country-percentage-summary-title">
-        <h2 id="country-percentage-summary-title">Percent topics/modules survey included in survey</h2>
-        <p>{selectedCountry === ALL_COUNTRIES ? "Distribution across surveys in the selected region." : "Distribution across surveys and subnational surveys in the selected country."}</p>
-        <div className="coverage-stat-grid">
-          <MetricCard label={selectedSurvey === ALL_SURVEYS ? "All selected surveys" : "Selected survey"} value={`${metrics.coverage}%`} tone="navy" note={`${metrics.included} of ${metrics.total} topics/modules included`} />
-          <MetricCard label="Minimum" value={`${coverageSummary.minimumPercentage}%`} note={`${coverageSummary.minimumIncluded} topics/modules included`} />
-          <MetricCard label="Maximum" value={`${coverageSummary.maximumPercentage}%`} tone="cyan" note={`${coverageSummary.maximumIncluded} topics/modules included`} />
-          <MetricCard label="Median" value={`${coverageSummary.medianPercentage}%`} tone="navy" note={`${coverageSummary.medianIncluded} topics/modules included`} />
+      <div className="country-top-grid">
+        <div className="metric-grid country-primary-grid">
+          <MetricCard label="Total topics/modules" value={metrics.total} />
+          <MetricCard label="Topics/Modules included in survey" value={metrics.included} tone="cyan" />
+          <MetricCard label={selectedCountry === ALL_COUNTRIES ? "Surveys in selection" : "Surveys in selected country"} value={metrics.surveyCount} tone="navy" />
+          <PhotoPanel country />
         </div>
-      </section>
+
+        <section className="summary-statistics country-summary-statistics" aria-labelledby="country-percentage-summary-title">
+          <h2 id="country-percentage-summary-title">Percent topics/modules survey included in survey</h2>
+          <p>{selectedCountry === ALL_COUNTRIES ? "Distribution across surveys in the selected region." : "Distribution across surveys and subnational surveys in the selected country."}</p>
+          <div className="coverage-stat-grid">
+            <MetricCard label={selectedSurvey === ALL_SURVEYS ? "All selected surveys" : "Selected survey"} value={`${metrics.coverage}%`} tone="navy" note={`${metrics.included} of ${metrics.total} topics/modules included`} />
+            <MetricCard label="Minimum" value={`${coverageSummary.minimumPercentage}%`} note={`${coverageSummary.minimumIncluded} topics/modules included`} />
+            <MetricCard label="Maximum" value={`${coverageSummary.maximumPercentage}%`} tone="cyan" note={`${coverageSummary.maximumIncluded} topics/modules included`} />
+            <MetricCard label="Median" value={`${coverageSummary.medianPercentage}%`} tone="navy" note={`${coverageSummary.medianIncluded} topics/modules included`} />
+          </div>
+        </section>
+      </div>
 
       <section className="dashboard-section">
         <div className="section-title-row topic-title-row">
