@@ -57,12 +57,30 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   margin-bottom: 26px;
 }
 .view-heading h1 { margin: 0; font-size: 31px; line-height: 1.1; }
-.country-heading { flex-wrap: wrap; }
+.country-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  gap: 20px;
+}
 .title-with-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.country-heading .title-with-info { flex: 1 1 220px; }
+.country-heading .title-with-info { width: 100%; }
 .info-button { flex: 0 0 auto; display: inline-grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--cyan); border-radius: 50%; background: #fff; color: #087eab; font-family: Georgia, serif; font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer; }
 .info-button:hover, .info-button:focus-visible { background: var(--cyan); color: #fff; }
-.filter-row { display: flex; align-items: flex-end; justify-content: flex-end; gap: 20px; flex: 2 1 650px; flex-wrap: wrap; }
+.filter-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) auto;
+  align-items: end;
+  gap: 18px;
+  width: 100%;
+  padding: 16px 18px;
+  border: 1px solid #dce5e9;
+  border-radius: 18px;
+  background: #f8fbfc;
+}
+.filter-row .filter-control { min-width: 0; }
+.filter-row .filter-control select { width: 100%; max-width: none; }
+.filter-row .download-button { min-height: 40px; }
 
 .info-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(10, 35, 55, .64); backdrop-filter: blur(3px); }
 .info-modal { width: min(900px, 100%); max-height: min(86vh, 820px); overflow: auto; border: 1px solid #d9e4e9; border-radius: 24px; background: #fff; box-shadow: 0 24px 70px rgba(0, 0, 0, .28); }
@@ -492,18 +510,20 @@ footer { margin-top: 44px; padding-top: 12px; border-top: 1px solid #e3e6e8; col
   .coverage-stat-grid .metric-card { padding-inline: 18px; }
   .coverage-row, .coverage-head { grid-template-columns: 190px minmax(180px, 1fr) 180px; }
   .bar-row { grid-template-columns: 245px minmax(180px, 1fr) 44px; }
+  .filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .filter-row .download-button { grid-column: 1 / -1; justify-self: start; }
 }
 
 @media (max-width: 760px) {
   .dashboard-shell { padding: 22px 24px 32px; }
   .view-heading { flex-direction: column; align-items: stretch; }
   .view-heading > .filter-control { align-self: flex-end; }
-  .country-heading .title-with-info { flex: none; }
-  .filter-row { flex: none; justify-content: flex-start; flex-wrap: wrap; }
+  .country-heading .title-with-info { width: auto; }
+  .filter-row { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 15px; }
   .hero-grid, .metric-grid { min-width: 0; width: 100%; }
-  .filter-control { min-width: 135px; flex: 1 1 135px; }
+  .filter-control { min-width: 135px; }
   .filter-control select { max-width: 100%; width: 100%; }
-  .download-button { flex: 0 0 auto; }
+  .download-button { width: fit-content; }
   .hero-grid { grid-template-columns: 1fr; }
   .overview-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .coverage-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -529,8 +549,8 @@ footer { margin-top: 44px; padding-top: 12px; border-top: 1px solid #e3e6e8; col
   .methodology-grid { grid-template-columns: 1fr; }
   .methodology-card.methodology-wide { grid-column: auto; }
   .comparison-definitions > div { grid-template-columns: 1fr; gap: 4px; }
-  .filter-row { display: grid; grid-template-columns: 1fr 1fr; width: 100%; gap: 12px; }
-  .filter-row .filter-control:last-of-type, .download-button { grid-column: 1 / -1; }
+  .filter-row { grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px; }
+  .filter-row .download-button { grid-column: 1 / -1; width: 100%; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .country-primary-grid { grid-template-rows: repeat(2, minmax(142px, 1fr)); }
   .country-primary-grid .country-photo { width: 100%; min-height: 142px; }
