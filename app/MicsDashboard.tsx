@@ -17,6 +17,13 @@ type ViewName = "overview" | "country";
 type ComparisonMode = "All surveys in the same round" | "All survey in the same regions" | "Median of the country" | "Median of region" | "Median of MICS countries";
 
 const ROUND_ORDER = ["MICS 6", "MICS 5", "MICS 4", "MICS 3", "MICS 2"];
+const ROUND_LABELS: Record<string, string> = {
+  "MICS 6": "MICS 6 (2017–2023)",
+  "MICS 5": "MICS 5 (2012–2017)",
+  "MICS 4": "MICS 4 (2009–2013)",
+  "MICS 3": "MICS 3 (2005–2010)",
+  "MICS 2": "MICS 2 (1999–2003)",
+};
 const ALL_REGIONS = "All regions";
 const ALL_COUNTRIES = "All countries";
 const ALL_SURVEYS = "All surveys";
@@ -39,7 +46,7 @@ function countryKey(value: string) {
 }
 
 function shortContentTitle(value: string) {
-  return value
+  const title = value
     .replace(/^Contents of /i, "")
     .replace(/ questionnaire$/i, "")
     .replace(/^the /i, "")
@@ -50,21 +57,23 @@ function shortContentTitle(value: string) {
     .replace(/questionnaire/i, "")
     .trim()
     .replace(/^./, (character) => character.toUpperCase());
+  return title === "Household" ? "List of household members" : title;
 }
 
-function SelectControl({ label, value, values, onChange, ariaLabel, disabled = false }: {
+function SelectControl({ label, value, values, onChange, ariaLabel, disabled = false, displayLabels }: {
   label: string;
   value: string;
   values: string[];
   onChange: (value: string) => void;
   ariaLabel?: string;
   disabled?: boolean;
+  displayLabels?: Record<string, string>;
 }) {
   return (
     <label className="filter-control">
       <span>{label}</span>
       <select aria-label={ariaLabel ?? label} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)}>
-        {values.map((item) => <option key={item} value={item}>{item}</option>)}
+        {values.map((item) => <option key={item} value={item}>{displayLabels?.[item] ?? item}</option>)}
       </select>
     </label>
   );
@@ -221,7 +230,7 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
           <h1 id="overview-title">Overall</h1>
           <InfoButton label="Open guide to Overview calculations" onClick={() => setShowInfo(true)} />
         </div>
-        <SelectControl label="Content from" value={round} values={ROUND_ORDER} onChange={setRound} ariaLabel="MICS round" />
+        <SelectControl label="Content from" value={round} values={ROUND_ORDER} onChange={setRound} ariaLabel="MICS round" displayLabels={ROUND_LABELS} />
       </div>
 
       {showInfo && <InfoModal id="overview-guide-title" title="How the Overview is calculated" onClose={() => setShowInfo(false)}>
@@ -237,47 +246,43 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
             <div className="formula-box"><strong>Included country-topic pairs</strong><span>÷</span><strong>Topics/modules × countries</strong><span>× 100</span></div>
             <p>The absolute number beneath the percentage is the average included topics/modules per country.</p>
           </section>
-          <section className="methodology-card"><h3>Minimum, maximum and median</h3><p>Each country’s percentage is its distinct included topics/modules divided by all topics/modules in the selected round. The cards summarize those country percentages; their notes show absolute topic/module counts.</p></section>
+          <section className="methodology-card"><h3>Minimum and maximum</h3><p>Each country’s percentage is its distinct included topics/modules divided by all topics/modules in the selected round. The cards show the lowest and highest country percentages; their notes show absolute topic/module counts.</p></section>
           <section className="methodology-card"><h3>Coverage by topic/module</h3><p>The orange bar shows countries including the topic out of countries with a record for it. Regional rates use the same calculation. Orange, black and blue vertical lines are the regional minimum, median and maximum; equal values intentionally overlap.</p></section>
-          <section className="methodology-card methodology-wide"><h3>Questions coverage</h3><p>For the selected questionnaire, each bar divides distinct countries including the question by distinct countries with a record for it. Hover or focus a mark for the numerator, denominator and percentage.</p></section>
+          <section className="methodology-card methodology-wide"><h3>Topics/Modules coverage</h3><p>For the selected questionnaire, each bar divides distinct countries including the topic/module by distinct countries with a record for it. Hover or focus a mark for the numerator, denominator and percentage.</p></section>
         </div>
       </InfoModal>}
 
       <div className="overview-top-grid">
         <div className="overview-primary-grid">
-          <MetricCard label="Topics/Modules" value={metrics.topics} />
+          <MetricCard label="Total topics/modules in this round" value={metrics.topics} />
           <MetricCard label="Total participated countries" value={metrics.countries} tone="pale" />
-          <MetricCard label="Total surveys" value={metrics.surveys} tone="gray" />
+          <MetricCard label="Total surveys in this round" value={metrics.surveys} tone="gray" />
           <PhotoPanel />
         </div>
 
         <section className="summary-statistics" aria-labelledby="percentage-summary-title">
-          <h2 id="percentage-summary-title">Percent topics/modules survey included in survey</h2>
+          <h2 id="percentage-summary-title">Percent topics/modules included in survey</h2>
           <p>Distribution across participating countries in the selected MICS round.</p>
-          <div className="coverage-stat-grid">
-            <MetricCard label="Percent topics/modules survey included in survey" value={`${metrics.coverage}%`} tone="navy" note={`${metrics.averageIncluded} of ${metrics.topics} topics/modules included per country`} />
+          <div className="coverage-stat-grid overview-coverage-stat-grid">
+            <MetricCard label="Percent topics/modules included in survey" value={`${metrics.coverage}%`} tone="navy" note={`${metrics.averageIncluded} of ${metrics.topics} topics/modules included per country`} />
             <MetricCard label="Minimum" value={`${metrics.minimumPercentage}%`} note={`${metrics.minimumIncluded} of ${metrics.topics} topics/modules included`} />
             <MetricCard label="Maximum" value={`${metrics.maximumPercentage}%`} tone="cyan" note={`${metrics.maximumIncluded} of ${metrics.topics} topics/modules included`} />
-            <MetricCard label="Median" value={`${metrics.medianPercentage}%`} tone="navy" note={`${metrics.medianCountryIncluded} of ${metrics.topics} topics/modules included`} />
           </div>
         </section>
       </div>
 
       <section className="dashboard-section">
-        <h2>Percent topics/modules survey included in survey by topic/module</h2>
+        <h2>Topic/module inclusion across countries and regions</h2>
         <p className="section-note">Regional minimum, median and maximum percentages. Hover or focus any mark for its exact value.</p>
-        <div className="coverage-head"><span>Total countries</span><span>Percent topics/modules survey included in survey</span></div>
+        <div className="coverage-head"><span>Total countries</span><span>Percent topics/modules included in survey</span></div>
         <div className="coverage-table">
           {coverageRows.map((item) => {
             return <div className="coverage-row" key={item.question}>
-              <span className="row-label">{item.question.replace("List of ", "")}</span>
+              <span className="row-label">{item.question}</span>
               <DataTooltip block text={`${item.question}: ${item.includedCountries} of ${item.totalCountries} countries include this topic (${item.countryCoverage}%)`}>
                 <div className="total-bar-group">
                   <div className="range-bar country-count-bar">
                     <i className="country-included" style={{ width: `${item.countryCoverage}%` }} />
-                  </div>
-                  <div className="total-bar-labels">
-                    <span>{item.includedCountries} included</span><span>{item.totalCountries} countries</span>
                   </div>
                 </div>
               </DataTooltip>
@@ -298,22 +303,21 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
 
       <section className="dashboard-section question-section">
         <div className="section-title-row">
-          <h2>Questions coverage</h2>
+          <h2>Topics/Modules coverage</h2>
           <SelectControl label="" value={selectedQuestionnaire} values={contentTitles} onChange={setQuestionnaire} ariaLabel="Questionnaire" />
         </div>
-        <p className="section-note">Share of surveyed countries including each question.</p>
+        <p className="section-note">Share of surveyed countries including each topic/module.</p>
         <div className="bar-list">
           {questionCoverage.map((item) => (
             <div className="bar-row" key={item.question}>
               <span>{item.question}</span>
-              <DataTooltip block text={`${item.question}: ${item.included} of ${item.total} surveyed countries (${item.coverage}%) include this question`}>
+              <DataTooltip block text={`${item.question}: ${item.included} of ${item.total} surveyed countries (${item.coverage}%) include this topic/module`}>
                 <div className="bar-track"><i style={{ width: `${item.coverage}%` }} /></div>
               </DataTooltip>
-              <b>{item.coverage}% <small>{item.included}/{item.total}</small></b>
             </div>
           ))}
         </div>
-        <p className="chart-caption">% of surveyed countries that include the question in the selected questionnaire</p>
+        <p className="chart-caption">% of surveyed countries that include the topic/module in the selected questionnaire</p>
       </section>
     </section>
   );
@@ -411,7 +415,7 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
   }, [contentTitles, currentRows, rows, round, selectedRegion, selectedCountry, selectedSurvey, selectedComparisonMode]);
 
   function downloadCsv() {
-    const header = ["Content Title", "Region", "Survey", "Country Name", "MICS Round", "Question", "Include"];
+    const header = ["Content Title", "Region", "Survey", "Country Name", "MICS Round", "Topics/Modules", "Include"];
     const escape = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
     const csv = [header, ...currentRows.map((row) => [row.contentTitle, row.region, row.survey, row.countryName, row.round, row.question, row.include])]
       .map((line) => line.map(escape).join(",")).join("\r\n");
@@ -434,7 +438,7 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
           <SelectControl label="Region" value={selectedRegion} values={regionOptions} onChange={(value) => { setRegion(value); setCountry(""); setSurvey(""); }} />
           <SelectControl label="Country" value={selectedCountry} values={countries} onChange={(value) => { setCountry(value); setSurvey(""); }} />
           <SelectControl label="Survey" value={selectedSurvey} values={surveys} onChange={setSurvey} />
-          <SelectControl label="Content from" value={round} values={ROUND_ORDER} onChange={setRound} ariaLabel="MICS round" />
+          <SelectControl label="Content from" value={round} values={ROUND_ORDER} onChange={setRound} ariaLabel="MICS round" displayLabels={ROUND_LABELS} />
           <button className="download-button" type="button" onClick={downloadCsv}>Download summary data</button>
         </div>
       </div>
@@ -451,7 +455,7 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
             <div className="formula-box"><strong>Distinct included topics/modules</strong><span>÷</span><strong>Distinct topics/modules in selection</strong><span>× 100</span></div>
             <p>Minimum, maximum and median summarize the individual surveys available within the selected country or selection. Notes show absolute included counts.</p>
           </section>
-          <section className="methodology-card methodology-wide"><h3>Topic/module comparison chart</h3><p>For each questionnaire topic/module, coverage is included questions divided by all questions in that topic/module. The <strong>blue line</strong> is the active top-filter selection. Thin dark-gray lines are comparison surveys. Equal values intentionally overlap, and the tooltip lists overlapping surveys.</p></section>
+          <section className="methodology-card methodology-wide"><h3>Topic/module comparison chart</h3><p>For each questionnaire content group, coverage is included topics/modules divided by all topics/modules in that group. The <strong>blue line</strong> is the active top-filter selection. Thin dark-gray lines are comparison surveys. Equal values intentionally overlap, and the tooltip lists overlapping surveys.</p></section>
           <section className="methodology-card methodology-wide"><h3>Compare with options</h3>
             <dl className="comparison-definitions">
               <div><dt>All surveys in the same round</dt><dd>One comparison line for every survey in the selected MICS round.</dd></div>
@@ -474,7 +478,7 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
         </div>
 
         <section className="summary-statistics country-summary-statistics" aria-labelledby="country-percentage-summary-title">
-          <h2 id="country-percentage-summary-title">Percent topics/modules survey included in survey</h2>
+          <h2 id="country-percentage-summary-title">Percent topics/modules included in survey</h2>
           <p>{selectedCountry === ALL_COUNTRIES ? "Distribution across surveys in the selected region." : "Distribution across surveys and subnational surveys in the selected country."}</p>
           <div className="coverage-stat-grid">
             <MetricCard label={selectedSurvey === ALL_SURVEYS ? "All selected surveys" : "Selected survey"} value={`${metrics.coverage}%`} tone="navy" note={`${metrics.included} of ${metrics.total} topics/modules included`} />
@@ -487,16 +491,16 @@ function CountryView({ rows, round, setRound }: { rows: MicsRow[]; round: string
 
       <section className="dashboard-section">
         <div className="section-title-row topic-title-row">
-          <h2>Percent topics/modules survey included in survey</h2>
+          <h2>Percent topics/modules included in survey</h2>
           <SelectControl label="Compare with" value={selectedComparisonMode} values={comparisonOptions} disabled={selectedRegion === ALL_REGIONS} onChange={(value) => setComparisonMode(value as ComparisonMode)} ariaLabel="Topic coverage comparison" />
         </div>
         <p className="section-note">The blue line shows the active survey, country, region or round selection. Dark-gray lines show the selected comparison group.</p>
-        <div className="coverage-head country-coverage-head"><span>Topics/Modules</span><span>Percent topics/modules survey included in survey</span></div>
+        <div className="coverage-head country-coverage-head"><span>Topics/Modules</span><span>Percent topics/modules included in survey</span></div>
         <div className="coverage-table country-coverage">
           {topicCoverage.map((item) => (
             <div className="coverage-row" key={item.name}>
-              <span className="row-label">{item.name}<small>{item.included} of {item.total} questions · {item.coverage}%</small></span>
-              <DataTooltip block text={`${item.name}: ${item.included} of ${item.total} questions included (${item.coverage}%)`}>
+              <span className="row-label">{item.name}</span>
+              <DataTooltip block text={`${item.name}: ${item.included} of ${item.total} topics/modules included (${item.coverage}%)`}>
                 <div className="single-bar"><i style={{ width: `${item.coverage}%` }} /></div>
               </DataTooltip>
               <div className="country-comparison-range" aria-label={`${item.name} country comparison`}>
