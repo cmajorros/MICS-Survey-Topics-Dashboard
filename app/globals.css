@@ -1,6 +1,9 @@
 @import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=PT+Serif:ital,wght@0,400;0,700;1,400;1,700&family=Roboto:wght@400;500;700;900&display=swap");
 
 :root {
+  --primary-font: "Roboto", sans-serif;
+  --secondary-font: "PT Serif", serif;
   --cyan: #22a9d6;
   --cyan-soft: #e6f4fa;
   --navy: #19466f;
@@ -20,7 +23,7 @@ body {
   margin: 0;
   background: #f3f5f6;
   color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--primary-font);
 }
 
 button, select { font: inherit; }
@@ -65,7 +68,7 @@ button, select, [tabindex] { outline-color: var(--cyan); }
 }
 .title-with-info { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .country-heading .title-with-info { width: 100%; }
-.info-button { flex: 0 0 auto; display: inline-grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--cyan); border-radius: 50%; background: #fff; color: #087eab; font-family: Georgia, serif; font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer; }
+.info-button { flex: 0 0 auto; display: inline-grid; place-items: center; width: 28px; height: 28px; border: 2px solid var(--cyan); border-radius: 50%; background: #fff; color: #087eab; font-family: var(--secondary-font); font-size: 18px; font-weight: 700; line-height: 1; cursor: pointer; }
 .info-button:hover, .info-button:focus-visible { background: var(--cyan); color: #fff; }
 .filter-row {
   display: grid;
@@ -315,7 +318,7 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   border-radius: 5px;
   background: #fff;
   color: var(--ink);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--primary-font);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
@@ -359,7 +362,7 @@ button, select, [tabindex] { outline-color: var(--cyan); }
   border-radius: 8px;
   background: #102f4d;
   color: #fff;
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--primary-font);
   font-size: 12px;
   font-weight: 400;
   line-height: 1.35;
