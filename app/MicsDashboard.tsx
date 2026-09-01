@@ -96,7 +96,7 @@ function MetricCard({ label, value, tone = "gray", note, children, className = "
 }
 
 function PhotoPanel({ country = false }: { country?: boolean }) {
-  return <div className={`feature-photo${country ? " country-photo" : ""}`} role="img" aria-label={country ? "MICS field team preparing survey equipment" : "Children playing beneath a blue canopy"} />;
+  return <div className={`feature-photo${country ? " country-photo" : ""}`} role="img" aria-label="Children playing beneath a blue canopy" />;
 }
 
 function DataTooltip({ text, children, block = false }: { text: string; children: React.ReactNode; block?: boolean }) {
@@ -144,71 +144,37 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
   const selectedQuestionnaire = contentTitles.includes(questionnaire)
     ? questionnaire
     : contentTitles.find((title) => /household/i.test(title)) ?? contentTitles[0] ?? "";
+  const questionnaireLabels = useMemo(
+    () => Object.fromEntries(contentTitles.map((title) => [title, shortContentTitle(title)])),
+    [contentTitles],
+  );
 
   const metrics = useMemo(() => {
     const topics = unique(filtered.map((row) => row.question)).length;
-    const countryStatistics = unique(filtered.map((row) => row.countryName)).map((countryName) => {
-      const countryRows = filtered.filter((row) => row.countryName === countryName);
-      const includedTopics = unique(countryRows.filter((row) => row.include === 1).map((row) => row.question));
-      return {
-        included: includedTopics.length,
-        percentage: percent(includedTopics.length, topics),
-      };
-    });
-    const countryPercentages = countryStatistics.map((item) => item.percentage);
     const countries = unique(filtered.map((row) => row.countryName));
     const surveys = unique(filtered.map((row) => row.survey));
-    const includedCountryTopicPairs = new Set(
-      filtered
-        .filter((row) => row.include === 1)
-        .map((row) => `${row.countryName}||${row.question}`),
-    );
+    const surveyStatistics = surveys.map((surveyName) => {
+      const surveyRows = filtered.filter((row) => row.survey === surveyName);
+      return unique(surveyRows.filter((row) => row.include === 1).map((row) => row.question)).length;
+    }).filter((included) => included > 0);
+    const totalIncluded = surveyStatistics.reduce((sum, included) => sum + included, 0);
     return {
       topics,
-      coverage: percent(includedCountryTopicPairs.size, topics * countries.length),
       countries: countries.length,
       surveys: surveys.length,
-      averageIncluded: countries.length ? Math.round(includedCountryTopicPairs.size / countries.length) : 0,
-      minimumIncluded: countryStatistics.length ? Math.min(...countryStatistics.map((item) => item.included)) : 0,
-      maximumIncluded: countryStatistics.length ? Math.max(...countryStatistics.map((item) => item.included)) : 0,
-      medianCountryIncluded: median(countryStatistics.map((item) => item.included)),
-      minimumPercentage: countryPercentages.length ? Math.min(...countryPercentages) : 0,
-      maximumPercentage: countryPercentages.length ? Math.max(...countryPercentages) : 0,
-      medianPercentage: median(countryPercentages),
+      averageIncluded: surveyStatistics.length ? Math.round(totalIncluded / surveyStatistics.length) : 0,
+      minimumIncluded: surveyStatistics.length ? Math.min(...surveyStatistics) : 0,
+      maximumIncluded: surveyStatistics.length ? Math.max(...surveyStatistics) : 0,
     };
   }, [filtered]);
 
-  const coverageRows = useMemo(() => {
-    return contentTitles.map((contentTitle) => {
-      const questionnaireRows = filtered.filter((row) => row.contentTitle === contentTitle);
-      const regionalRates = unique(questionnaireRows.map((row) => row.region)).map((region) => {
-        const regionRows = questionnaireRows.filter((row) => row.region === region);
-        const regionCountries = unique(regionRows.map((row) => row.countryName));
-        const includedCountries = regionCountries.filter((countryName) => regionRows.some((row) => row.countryName === countryName && row.include === 1));
-        return percent(includedCountries.length, regionCountries.length);
-      });
-      const countries = unique(questionnaireRows.map((row) => row.countryName));
-      const includedCountries = countries.filter((countryName) => questionnaireRows.some((row) => row.countryName === countryName && row.include === 1));
-      return {
-        contentTitle,
-        label: shortContentTitle(contentTitle),
-        totalCountries: countries.length,
-        includedCountries: includedCountries.length,
-        countryCoverage: percent(includedCountries.length, countries.length),
-        min: regionalRates.length ? Math.min(...regionalRates) : 0,
-        median: median(regionalRates),
-        max: regionalRates.length ? Math.max(...regionalRates) : 0,
-      };
-    });
-  }, [filtered, contentTitles]);
-
   const questionCoverage = useMemo(() => {
     const source = filtered.filter((row) => row.contentTitle === selectedQuestionnaire);
+    const surveys = unique(filtered.map((row) => row.survey));
     return unique(source.map((row) => row.question)).map((question) => {
       const questionRows = source.filter((row) => row.question === question);
-      const countries = unique(questionRows.map((row) => row.countryName));
-      const included = countries.filter((countryName) => questionRows.some((row) => row.countryName === countryName && row.include === 1)).length;
-      return { question, included, total: countries.length, coverage: percent(included, countries.length) };
+      const included = surveys.filter((surveyName) => questionRows.some((row) => row.survey === surveyName && row.include === 1)).length;
+      return { question, included, total: surveys.length, coverage: percent(included, surveys.length) };
     });
   }, [filtered, selectedQuestionnaire]);
 
@@ -223,90 +189,58 @@ function OverviewView({ rows, round, setRound }: { rows: MicsRow[]; round: strin
       </div>
 
       {showInfo && <InfoModal id="overview-guide-title" title="How the Overview is calculated" onClose={() => setShowInfo(false)}>
-        <p className="methodology-intro">All values use records from the MICS round selected under <strong>Content from</strong>. A topic/module is included when its <strong>Include</strong> value is 1.</p>
+        <p className="methodology-intro">All values use surveys from the MICS round selected under <strong>Content from</strong>. A topic/module is included in a calculation when it is included in the survey.</p>
         <div className="methodology-grid">
           <section className="methodology-card"><h3>Headline metrics</h3><ul>
-            <li><strong>Topics/Modules:</strong> distinct topic/module names in the selected round.</li>
-            <li><strong>Total participated countries:</strong> distinct cleaned Country Name values. Multiple surveys from one country count once.</li>
-            <li><strong>Total surveys:</strong> distinct Survey values, including national and subnational surveys.</li>
+            <li><strong>Participating countries in this round:</strong> the number of countries with at least one survey in the selected round. A country is counted once even when it implemented multiple national, subnational or subpopulation surveys.</li>
+            <li><strong>Number of surveys in this round:</strong> all surveys in the selected round, irrespective of national representation. A country may contribute more than one survey.</li>
+            <li><strong>Total topics/modules in this round:</strong> the number of individual topics/modules offered in the selected round.</li>
           </ul></section>
-          <section className="methodology-card"><h3>Overall percentage</h3>
-            <p>Each country-topic pair counts once. If any survey for a country includes a topic/module, that pair is included.</p>
-            <div className="formula-box"><strong>Included country-topic pairs</strong><span>÷</span><strong>Topics/modules × countries</strong><span>× 100</span></div>
-            <p>The absolute number beneath the percentage is the average included topics/modules per country.</p>
+          <section className="methodology-card"><h3>Selection of topics/modules</h3>
+            <p>For each survey, the dashboard counts the distinct topics/modules included. The three cards summarize those survey-level counts.</p>
+            <div className="formula-box"><strong>Total included topics/modules across surveys</strong><span>÷</span><strong>Number of surveys</strong></div>
+            <p>The mean is rounded to the nearest whole topic/module. The minimum and maximum are the smallest and largest survey questionnaire counts. All-zero placeholder records are excluded from these three statistics.</p>
           </section>
-          <section className="methodology-card"><h3>Minimum and maximum</h3><p>Each country’s percentage is its distinct included topics/modules divided by all topics/modules in the selected round. The cards show the lowest and highest country percentages; their notes show absolute topic/module counts.</p></section>
-          <section className="methodology-card"><h3>Questionnaire inclusion</h3><p>Every questionnaire available in the selected round is shown. The orange bar counts countries with at least one included topic/module in that questionnaire. Regional rates use the same calculation. Orange, black and blue vertical lines are the regional minimum, median and maximum; equal values intentionally overlap.</p></section>
-          <section className="methodology-card methodology-wide"><h3>Topics/Modules coverage</h3><p>Every topic/module in the selected questionnaire is shown. Each bar divides distinct countries including the topic/module by distinct countries with a record for it. Hover or focus a mark for the numerator, denominator and percentage.</p></section>
+          <section className="methodology-card methodology-wide"><h3>Topics/modules included across surveys</h3><p>For the selected questionnaire, each bar shows the percentage of surveys in the round that included the individual topic/module. The numerator is the number of surveys including it; the denominator is the total number of surveys in the round. Hover or focus a bar for the exact values.</p></section>
         </div>
       </InfoModal>}
 
       <div className="overview-top-grid">
         <div className="overview-primary-grid">
+          <MetricCard label="Participating countries in this round" value={metrics.countries} tone="pale" />
+          <MetricCard label="Number of surveys in this round" value={metrics.surveys} tone="gray" />
           <MetricCard label="Total topics/modules in this round" value={metrics.topics} />
-          <MetricCard label="Total participated countries" value={metrics.countries} tone="pale" />
-          <MetricCard label="Total surveys in this round" value={metrics.surveys} tone="gray" />
           <PhotoPanel />
         </div>
 
         <section className="summary-statistics" aria-labelledby="percentage-summary-title">
-          <h2 id="percentage-summary-title">Percent topics/modules included in survey</h2>
-          <p>Distribution across participating countries in the selected MICS round.</p>
+          <h2 id="percentage-summary-title">Selection of topics/modules</h2>
+          <p>Distribution across surveys in the selected round.</p>
           <div className="coverage-stat-grid overview-coverage-stat-grid">
-            <MetricCard label="Percent topics/modules included in survey" value={`${metrics.coverage}%`} tone="navy" note={`${metrics.averageIncluded} of ${metrics.topics} topics/modules included per country`} />
-            <MetricCard label="Minimum" value={`${metrics.minimumPercentage}%`} note={`${metrics.minimumIncluded} of ${metrics.topics} topics/modules included`} />
-            <MetricCard label="Maximum" value={`${metrics.maximumPercentage}%`} tone="cyan" note={`${metrics.maximumIncluded} of ${metrics.topics} topics/modules included`} />
+            <MetricCard label="Mean number of topics/modules included across all surveys in this round" value={metrics.averageIncluded} tone="navy" note={`On average, ${metrics.averageIncluded} of ${metrics.topics} topics/modules were included per survey`} />
+            <MetricCard label="Minimum" value={metrics.minimumIncluded} note={`The smallest survey questionnaire included ${metrics.minimumIncluded} of ${metrics.topics} topics/modules`} />
+            <MetricCard label="Maximum" value={metrics.maximumIncluded} tone="cyan" note={`The largest survey questionnaire included ${metrics.maximumIncluded} of ${metrics.topics} topics/modules`} />
           </div>
         </section>
       </div>
 
-      <section className="dashboard-section">
-        <h2>Questionnaire inclusion across countries and regions</h2>
-        <p className="section-note">Regional minimum, median and maximum percentages. Hover or focus any mark for its exact value.</p>
-        <div className="coverage-head"><span>Total countries</span><span>Percent countries including questionnaire</span></div>
-        <div className="coverage-table">
-          {coverageRows.map((item) => {
-            return <div className="coverage-row" key={item.contentTitle}>
-              <span className="row-label">{item.label}</span>
-              <DataTooltip block text={`${item.label}: ${item.includedCountries} of ${item.totalCountries} countries include this questionnaire (${item.countryCoverage}%)`}>
-                <div className="total-bar-group">
-                  <div className="range-bar country-count-bar">
-                    <i className="country-included" style={{ width: `${item.countryCoverage}%` }} />
-                  </div>
-                </div>
-              </DataTooltip>
-              <div className="dot-range marker-range">
-                <i tabIndex={0} aria-label={`Minimum coverage ${item.min}%`} data-tooltip={`Minimum coverage: ${item.min}%`} className={`coverage-marker marker-orange has-tooltip ${item.min >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.min)}%` }}>{item.min !== item.median && item.min !== item.max && <span>{item.min}%</span>}</i>
-                <i tabIndex={0} aria-label={`Median coverage ${item.median}%`} data-tooltip={`Median coverage: ${item.median}%`} className={`coverage-marker marker-gray has-tooltip ${item.median >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.median)}%` }}>{item.median !== item.max && <span>{item.median}%</span>}</i>
-                <i tabIndex={0} aria-label={`Maximum coverage ${item.max}%`} data-tooltip={`Maximum coverage: ${item.max}%`} className={`coverage-marker marker-blue has-tooltip ${item.max >= 95 ? "at-right" : ""}`} style={{ left: `${clamp(item.max)}%` }}><span>{item.max}%</span></i>
-              </div>
-            </div>;
-          })}
-        </div>
-        <div className="legend coverage-marker-legend">
-          <span><i className="line-marker-key marker-blue" />maximum</span>
-          <span><i className="line-marker-key marker-gray" />median</span>
-          <span><i className="line-marker-key marker-orange" />minimum</span>
-        </div>
-      </section>
-
       <section className="dashboard-section question-section">
         <div className="section-title-row">
-          <h2>Topics/Modules coverage</h2>
-          <SelectControl label="" value={selectedQuestionnaire} values={contentTitles} onChange={setQuestionnaire} ariaLabel="Questionnaire" />
+          <h2>Topics/modules included across surveys</h2>
+          <SelectControl label="" value={selectedQuestionnaire} values={contentTitles} onChange={setQuestionnaire} ariaLabel="Questionnaire" displayLabels={questionnaireLabels} />
         </div>
-        <p className="section-note">Share of surveyed countries including each topic/module.</p>
+        <p className="section-note">Share of surveys that included each individual topic/module, by questionnaire.</p>
         <div className="bar-list">
           {questionCoverage.map((item) => (
             <div className="bar-row" key={item.question}>
               <span>{formatTopicLabel(item.question)}</span>
-              <DataTooltip block text={`${item.question}: ${item.included} of ${item.total} surveyed countries (${item.coverage}%) include this topic/module`}>
+              <DataTooltip block text={`${item.question}: ${item.included} of ${item.total} surveys (${item.coverage}%) included this topic/module`}>
                 <div className="bar-track"><i style={{ width: `${item.coverage}%` }} /></div>
               </DataTooltip>
             </div>
           ))}
         </div>
-        <p className="chart-caption">% of surveyed countries that include the topic/module in the selected questionnaire</p>
+        <p className="chart-caption">Percentage of surveys including each topic/module in the selected round, by questionnaire</p>
       </section>
     </section>
   );
